@@ -11,10 +11,13 @@ from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 from vitalsense5.contracts import DeviceStatus, PatientRecord
 from vitalsense5.theme import (
     COLORS,
+    FONT_FAMILY,
     LAYOUT,
+    RADII,
     TYPOGRAPHY,
     font_from_token,
     jetbrains_mono_font,
+    modal_card_qss,
     patient_card_qss,
 )
 from vitalsense5.widgets import ActionButton, StatusHeaderBar, TouchScrollArea
@@ -47,14 +50,14 @@ class _PatientCard(QFrame):
         self.lbl_name.setObjectName(f"{card_name}_name")
         self.lbl_name.setFont(font_from_token(TYPOGRAPHY.PATIENT_CARD_NAME))
         self.lbl_name.setStyleSheet(f"color: {COLORS.TEXT_PRIMARY}; background: transparent;")
-        self.lbl_name.setGeometry(29, 13, 590, 45)
+        self.lbl_name.setGeometry(29, 13, 450, 45)
         self.lbl_name.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         self.lbl_meta = QLabel("", self)
         self.lbl_meta.setObjectName(f"{card_name}_meta")
         self.lbl_meta.setFont(font_from_token(TYPOGRAPHY.PATIENT_CARD_META))
         self.lbl_meta.setStyleSheet(f"color: {COLORS.TEXT_PRIMARY}; background: transparent;")
-        self.lbl_meta.setGeometry(630, 20, 510, 31)
+        self.lbl_meta.setGeometry(490, 20, 650, 31)
         self.lbl_meta.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         self.update_patient(patient, selected=selected)
@@ -68,6 +71,7 @@ class _PatientCard(QFrame):
         )
         self.lbl_name.setText(elided_name)
         meta_text = (
+            f"Gender: {patient.gender.value}  "
             f"Age: {patient.age}  Height: {patient.height_cm}cm  Weight: {patient.weight_kg}kg"
         )
         elided_meta = self.lbl_meta.fontMetrics().elidedText(
@@ -110,6 +114,7 @@ class PatientScreen(QWidget):
     """Patient list, selection, and creation/editing navigation screen."""
 
     back_requested = pyqtSignal()
+    delete_patient_requested = pyqtSignal()
     edit_patient_requested = pyqtSignal()
     new_patient_requested = pyqtSignal()
     patient_selected = pyqtSignal(str)
@@ -205,6 +210,14 @@ class PatientScreen(QWidget):
         )
         self.btn_back.move(62, 628)
 
+        self.btn_delete_patient = ActionButton(
+            "DELETE",
+            variant="danger",
+            object_name="btn_delete_patient",
+            parent=self,
+        )
+        self.btn_delete_patient.move(572, 628)
+
         self.btn_edit_patient = ActionButton(
             "EDIT PATIENT",
             variant="default",
@@ -222,6 +235,7 @@ class PatientScreen(QWidget):
         self.btn_new_patient.move(1016, 628)
 
         self.btn_back.clicked.connect(self.back_requested.emit)
+        self.btn_delete_patient.clicked.connect(self.delete_patient_requested.emit)
         self.btn_edit_patient.clicked.connect(self.edit_patient_requested.emit)
         self.btn_new_patient.clicked.connect(self.new_patient_requested.emit)
 
@@ -258,6 +272,7 @@ class PatientScreen(QWidget):
         )
         self.lbl_empty_patients.setVisible(not has_patients)
         self.btn_edit_patient.setEnabled(has_patients and has_active_match)
+        self.btn_delete_patient.setEnabled(has_patients and has_active_match)
 
     def set_selected_patient(self, patient_id: str | None) -> None:
         self._active_patient_id = patient_id
@@ -268,6 +283,7 @@ class PatientScreen(QWidget):
                 matched = True
             card.set_selected(is_sel)
         self.btn_edit_patient.setEnabled(bool(self._cards) and matched)
+        self.btn_delete_patient.setEnabled(bool(self._cards) and matched)
 
     def update_device_status(self, status: DeviceStatus) -> None:
         self.header_bar.update_device_status(status)
@@ -276,4 +292,91 @@ class PatientScreen(QWidget):
         self.header_bar.refresh_clock(now)
 
 
-__all__ = ["PatientScreen"]
+class ConfirmDeleteDialog(QFrame):
+    """Non-blocking 540x200 confirmation modal before deleting a patient record."""
+
+    cancelled = pyqtSignal()
+    confirmed = pyqtSignal(str)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._patient_id: str | None = None
+
+        self.setObjectName("confirm_delete_dialog")
+        self.setFixedSize(540, 200)
+        self.setStyleSheet(
+            modal_card_qss(
+                radius=RADII.MODAL_CARD,
+                background=COLORS.SURFACE_CARD,
+                selector="#confirm_delete_dialog",
+            )
+        )
+
+        self.lbl_confirm_title = QLabel("Delete Patient?", self)
+        self.lbl_confirm_title.setObjectName("lbl_confirm_title")
+        self.lbl_confirm_title.setGeometry(24, 18, 492, 34)
+        self.lbl_confirm_title.setFont(jetbrains_mono_font(size_px=24, weight=600))
+        self.lbl_confirm_title.setStyleSheet(
+            f"color: {COLORS.TEXT_PRIMARY}; background: transparent;"
+        )
+        self.lbl_confirm_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.lbl_confirm_message = QLabel("", self)
+        self.lbl_confirm_message.setObjectName("lbl_confirm_message")
+        self.lbl_confirm_message.setGeometry(24, 58, 492, 54)
+        self.lbl_confirm_message.setWordWrap(True)
+        self.lbl_confirm_message.setFont(jetbrains_mono_font(size_px=18, weight=300))
+        self.lbl_confirm_message.setStyleSheet(
+            f"color: {COLORS.TEXT_PRIMARY}; background: transparent;"
+        )
+        self.lbl_confirm_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.btn_confirm_cancel = ActionButton(
+            "CANCEL",
+            variant="default",
+            object_name="btn_confirm_cancel",
+            parent=self,
+        )
+        self.btn_confirm_cancel.move(36, 128)
+        self.btn_confirm_cancel.setStyleSheet(
+            f"#btn_confirm_cancel {{"
+            f" background-color: {COLORS.SETTINGS_PILL_BG};"
+            f" color: {COLORS.TEXT_PRIMARY};"
+            f" border: 1px solid #B5B5B5;"
+            f" border-radius: {RADII.ACTION_BUTTON}px;"
+            f" font-family: '{FONT_FAMILY}';"
+            f" font-size: 24px;"
+            f" font-weight: 300;"
+            f"}}"
+            f"#btn_confirm_cancel:pressed {{"
+            f" background-color: {COLORS.BTN_PRESSED_BG};"
+            f" color: {COLORS.BTN_PRESSED_TEXT};"
+            f"}}"
+        )
+
+        self.btn_confirm_delete = ActionButton(
+            "DELETE",
+            variant="danger",
+            object_name="btn_confirm_delete",
+            parent=self,
+        )
+        self.btn_confirm_delete.move(292, 128)
+
+        self.btn_confirm_cancel.clicked.connect(self.cancelled.emit)
+        self.btn_confirm_delete.clicked.connect(self._on_confirm_clicked)
+
+    def open_for_patient(self, patient: PatientRecord) -> None:
+        self._patient_id = patient.patient_id
+        elided_name = self.lbl_confirm_message.fontMetrics().elidedText(
+            patient.name,
+            Qt.TextElideMode.ElideRight,
+            340,
+        )
+        self.lbl_confirm_message.setText(f'Are you sure you want to delete "{elided_name}"?')
+
+    def _on_confirm_clicked(self) -> None:
+        if self._patient_id is not None:
+            self.confirmed.emit(self._patient_id)
+
+
+__all__ = ["ConfirmDeleteDialog", "PatientScreen"]

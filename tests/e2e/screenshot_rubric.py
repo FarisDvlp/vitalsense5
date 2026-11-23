@@ -408,7 +408,6 @@ def run_screenshot_rubric(output_dir: Path | str, window: Any = None) -> RubricR
             "ppg_canvas",
             "btn_patient",
             "btn_settings",
-            "btn_save",
             "btn_record",
         ]
         main_items: list[tuple[str, Any]] = []
@@ -438,7 +437,7 @@ def run_screenshot_rubric(output_dir: Path | str, window: Any = None) -> RubricR
                 main_res.errors.append(
                     f"ppg_canvas size {ppg.width()}x{ppg.height()} smaller than expected >=1000x200"
                 )
-        for btn_name in ("btn_patient", "btn_settings", "btn_save", "btn_record"):
+        for btn_name in ("btn_patient", "btn_settings", "btn_record"):
             btn = _find_widget(window, btn_name)
             if btn is not None and btn.height() < 44:
                 main_res.errors.append(f"{btn_name} height {btn.height()} < 44px touch target")
@@ -465,7 +464,13 @@ def run_screenshot_rubric(output_dir: Path | str, window: Any = None) -> RubricR
             patient_res.errors.append("patient_screen is not visible after clicking btn_patient")
         else:
             ps_items: list[tuple[str, Any]] = []
-            for name in ("patient_scroll_area", "btn_back", "btn_edit_patient", "btn_new_patient"):
+            for name in (
+                "patient_scroll_area",
+                "btn_back",
+                "btn_delete_patient",
+                "btn_edit_patient",
+                "btn_new_patient",
+            ):
                 w = _find_widget(ps_widget, name)
                 if w is None or not w.isVisible():
                     patient_res.errors.append(f"PatientScreen widget {name!r} missing or not visible")

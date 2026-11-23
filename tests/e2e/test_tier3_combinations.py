@@ -27,17 +27,25 @@ def test_c01_patient_switch_while_recording_active(make_app: object) -> None:
     ps = h.find_widget(ah.window, "patient_screen")
     cards = h.find_patient_cards(ps)
     h.click_widget(cards[1])
+    toast = h.find_widget(ah.window, "toast_banner")
+    assert toast.isVisible()
+    assert "Cannot change patient while recording" in toast.text()
     h.click_widget(h.find_widget(ps, "btn_back"))
 
     ms = h.find_widget(ah.window, "main_screen")
     assert ms.isVisible()
-    assert "Patient B" in h.find_widget(ms, "lbl_active_patient").text()
+    assert "Patient A" in h.find_widget(ms, "lbl_active_patient").text()
 
-    # Recording can still be stopped cleanly afterward if still active
+    # Recording can still be stopped cleanly afterward, then patient switch succeeds
     if not any(active is False for active, _ in ah.command_handler.record_calls):
         h.click_widget(h.find_widget(ms, "btn_record"))
         h.pump_events(50)
         assert any(active is False for active, _ in ah.command_handler.record_calls)
+
+    h.click_widget(h.find_widget(ms, "btn_patient"))
+    h.click_widget(h.find_patient_cards(ps)[1])
+    h.click_widget(h.find_widget(ps, "btn_back"))
+    assert "Patient B" in h.find_widget(ms, "lbl_active_patient").text()
 
 
 def test_c02_edit_selected_patient_syncs_main_screen_header(harness: h.AppHarness) -> None:
@@ -197,9 +205,7 @@ def test_c06_swappable_custom_adapters_drive_ui_without_mock(make_app: object) -
     assert "67%" in h.find_widget(ah.window, "lbl_battery_pct").text()
     assert h.images_differ(img_a, img_b)
 
-    h.click_widget(h.find_widget(ah.window, "btn_save"))
     h.click_widget(h.find_widget(ah.window, "btn_record"))
-    assert len(ah.command_handler.save_calls) == 1
     assert len(ah.command_handler.record_calls) == 1
 
     h.click_widget(h.find_widget(ah.window, "btn_settings"))
@@ -347,7 +353,7 @@ def test_c10_new_patient_validation_error_with_keyboard_and_cancel_cleanup(harne
     assert len(harness.patient_store.list_patients()) == initial_count
 
 
-def test_c11_save_snapshot_binds_selected_patient_and_latest_vitals(harness: h.AppHarness) -> None:
+def test_c11_record_session_binds_selected_patient_and_pr_readout(harness: h.AppHarness) -> None:
     h.click_widget(h.find_widget(harness.window, "btn_patient"))
     ps = h.find_widget(harness.window, "patient_screen")
     cards = h.find_patient_cards(ps)
@@ -361,20 +367,21 @@ def test_c11_save_snapshot_binds_selected_patient_and_latest_vitals(harness: h.A
         spo2_percent=97.0,
         bp_sys_mmhg=118,
         bp_dia_mmhg=76,
+        bpm=84,
     )
     h.pump_events(120)
 
-    btn_save = h.find_widget(harness.window, "btn_save")
-    h.press_and_hold(btn_save)
-    assert h.region_has_color(btn_save, "#3F3F3F", tolerance=22, min_pixels=40)
-    h.release_widget(btn_save)
+    assert h.find_widget(harness.window, "vital_bp_pr_value").text() == "84"
+
+    btn_rec = h.find_widget(harness.window, "btn_record")
+    h.click_widget(btn_rec)
     h.pump_events(60)
 
-    assert len(harness.command_handler.save_calls) == 1
-    saved_patient, saved_vitals = harness.command_handler.save_calls[0]
-    assert saved_patient.patient_id == "p-2"
-    assert saved_vitals.spo2_percent == 97.0
-    assert saved_vitals.bp_sys_mmhg == 118
+    assert len(harness.command_handler.record_calls) == 1
+    active, rec_patient = harness.command_handler.record_calls[0]
+    assert active is True
+    assert rec_patient.patient_id == "p-2"
+    assert btn_rec.text() == "RECORDING..."
 
 
 def test_c12_battery_cloud_and_clock_telemetry_sync_across_screens(harness: h.AppHarness) -> None:

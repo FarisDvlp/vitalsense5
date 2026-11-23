@@ -183,12 +183,15 @@ def test_f2_bpm_none_and_populated_both_supported(harness: h.AppHarness) -> None
 # ===========================================================================
 
 
-def test_f3_rapid_double_save_invokes_twice_without_lockup(harness: h.AppHarness) -> None:
-    btn_save = h.find_widget(harness.window, "btn_save")
-    h.click_widget(btn_save, wait_ms=10)
-    h.click_widget(btn_save, wait_ms=10)
+def test_f3_recording_timer_advances_without_lockup(harness: h.AppHarness) -> None:
+    btn_rec = h.find_widget(harness.window, "btn_record")
+    timer_lbl = h.find_widget(harness.window, "lbl_recording_timer")
+    h.click_widget(btn_rec, wait_ms=30)
+    t1 = timer_lbl.text()
     h.pump_events(80)
-    assert len(harness.command_handler.save_calls) == 2
+    t2 = timer_lbl.text()
+    assert timer_lbl.isVisible()
+    assert t2 != t1
     assert h.find_widget(harness.window, "main_screen").isVisible()
 
 
@@ -200,12 +203,15 @@ def test_f3_rapid_record_toggle_sequence_consistent(harness: h.AppHarness) -> No
     assert [call[0] for call in harness.command_handler.record_calls] == [True, False, True]
 
 
-def test_f3_save_failure_result_displays_error_gracefully(harness: h.AppHarness) -> None:
-    harness.command_handler.save_result = (False, "Storage offline")
-    h.click_widget(h.find_widget(harness.window, "btn_save"))
-    h.pump_events(80)
-    assert len(harness.command_handler.save_calls) == 1
-    assert h.find_widget(harness.window, "main_screen").isVisible()
+def test_f3_delete_confirmation_cancel_keeps_patient_intact(harness: h.AppHarness) -> None:
+    h.click_widget(h.find_widget(harness.window, "btn_patient"))
+    ps = h.find_widget(harness.window, "patient_screen")
+    before = len(harness.patient_store.list_patients())
+    h.click_widget(h.find_widget(ps, "btn_delete_patient"))
+    dlg = h.find_overlay(harness, "confirm_delete_dialog", require_visible=True)
+    assert dlg is not None
+    h.click_widget(h.find_widget(dlg, "btn_confirm_cancel"))
+    assert len(harness.patient_store.list_patients()) == before
 
 
 def test_f3_record_failure_does_not_latch_recording_active(harness: h.AppHarness) -> None:
@@ -314,7 +320,7 @@ def test_f4_long_patient_name_does_not_overflow_card(make_app: object) -> None:
     assert card_rect.right() <= 1280
 
 
-def test_f4_switch_patient_during_active_recording_safe(harness: h.AppHarness) -> None:
+def test_f4_switch_patient_during_active_recording_blocked(harness: h.AppHarness) -> None:
     h.click_widget(h.find_widget(harness.window, "btn_record"))
     harness.vital_port.set_status(recording_active=True, recording_elapsed_s=3)
     h.pump_events(60)
@@ -323,11 +329,14 @@ def test_f4_switch_patient_during_active_recording_safe(harness: h.AppHarness) -
     ps = h.find_widget(harness.window, "patient_screen")
     cards = h.find_patient_cards(ps)
     h.click_widget(cards[1])
+    toast = h.find_widget(harness.window, "toast_banner")
+    assert toast.isVisible()
+    assert "Cannot change patient while recording" in toast.text()
     h.click_widget(h.find_widget(ps, "btn_back"))
 
     ms = h.find_widget(harness.window, "main_screen")
     assert ms.isVisible()
-    assert "Patient Number 2" in h.find_widget(ms, "lbl_active_patient").text()
+    assert "Patient Number 1" in h.find_widget(ms, "lbl_active_patient").text()
 
 
 # ===========================================================================

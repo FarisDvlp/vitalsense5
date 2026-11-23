@@ -47,12 +47,11 @@ def test_t5_01_nan_inf_bp_bpm_and_battery_do_not_crash_or_freeze_stale_bp(
     h.pump_events(120)
 
     spo2_widget = h.find_widget(ah.window, "vital_spo2")
-    prv_widget = h.find_widget(ah.window, "vital_prv")
     lbl_battery = h.find_widget(ah.window, "lbl_battery_pct")
     main_screen = h.find_widget(ah.window, "main_screen")
     assert "95" in h.joined_text(spo2_widget)
     assert "120" not in h.joined_text(bp_widget) and "--" in h.joined_text(bp_widget)
-    assert "HR -- BPM" in h.joined_text(prv_widget)
+    assert h.find_widget(bp_widget, "vital_bp_pr_value").text() == "--"
     assert "--%" in lbl_battery.text()
     assert "offline" in h.joined_text(main_screen).lower()
 
@@ -317,11 +316,14 @@ def test_t5_07_adapter_exceptions_and_mock_recording_hook_resilience(qapp: objec
         def set_active_patient(self, pid: str) -> object:
             raise KeyError(pid)
 
-        def create_patient(self, *args: object) -> object:
+        def create_patient(self, *args: object, **kwargs: object) -> object:
             raise RuntimeError("save boom")
 
-        def update_patient(self, *args: object) -> object:
+        def update_patient(self, *args: object, **kwargs: object) -> object:
             raise RuntimeError("update boom")
+
+        def delete_patient(self, *args: object, **kwargs: object) -> None:
+            raise RuntimeError("delete boom")
 
         def save_snapshot(self, *args: object) -> tuple[bool, str]:
             raise RuntimeError("snapshot boom")
@@ -334,8 +336,6 @@ def test_t5_07_adapter_exceptions_and_mock_recording_hook_resilience(qapp: objec
     win.show()
     h.pump_events(60)
     try:
-        h.click_widget(h.find_widget(win, "btn_save"))
-        assert "Save failed" in h.find_widget(win, "toast_banner").text()
         h.click_widget(h.find_widget(win, "btn_record"))
         assert "Record error" in h.find_widget(win, "toast_banner").text()
         h.click_widget(h.find_widget(win, "btn_patient"))

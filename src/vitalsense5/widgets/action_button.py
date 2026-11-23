@@ -22,19 +22,19 @@ ActionButtonVariant = Literal["default", "danger", "success", "save", "recording
 
 
 def _recording_active_qss(*, pressed: bool = False) -> str:
-    initial_bg = COLORS.BTN_DANGER_PRESSED_BG if pressed else COLORS.ALARM_CRITICAL
+    initial_bg = COLORS.BTN_SUCCESS_PRESSED_BG if pressed else COLORS.BTN_SUCCESS_BG
     return (
         f"QPushButton {{"
         f" background-color: {initial_bg};"
         f" color: {COLORS.TEXT_PRIMARY};"
-        f" border: 2px solid {COLORS.BTN_PRESSED_BG};"
+        f" border: none;"
         f" border-radius: {RADII.ACTION_BUTTON}px;"
         f" font-family: '{FONT_FAMILY}';"
         f" font-size: 24px;"
         f" font-weight: 300;"
         f"}}"
         f"QPushButton:pressed, QPushButton[pressed=\"true\"] {{"
-        f" background-color: {COLORS.BTN_DANGER_PRESSED_BG};"
+        f" background-color: {COLORS.BTN_SUCCESS_PRESSED_BG};"
         f" color: {COLORS.TEXT_PRIMARY};"
         f"}}"
     )
@@ -82,9 +82,7 @@ class ActionButton(QPushButton):
 
     def set_recording_active(self, active: bool, elapsed_s: int = 0) -> None:
         if active:
-            mins = max(0, int(elapsed_s)) // 60
-            secs = max(0, int(elapsed_s)) % 60
-            self.setText(f"REC {mins:02d}:{secs:02d}")
+            self.setText("RECORDING...")
             self.set_variant("recording_active")
         else:
             self.setText("RECORD")

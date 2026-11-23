@@ -26,6 +26,7 @@ from vitalsense5.theme import (
 
 _DEFAULT_VALUE_SCALE_STEPS: tuple[int, ...] = (96, 76, 62, 50, 42)
 _BP_VALUE_SCALE_STEPS: tuple[int, ...] = (64, 54, 46, 38)
+_PR_VALUE_SCALE_STEPS: tuple[int, ...] = (36, 30, 24)
 
 
 def _is_finite_number(val: object) -> bool:
@@ -310,8 +311,38 @@ class BPColumnWidget(QFrame):
         self.lbl_header.setObjectName(f"{object_name}_header")
         self.lbl_header.setFont(font_from_token(TYPOGRAPHY.VITAL_HEADER))
         self.lbl_header.setStyleSheet(f"color: {COLORS.TEXT_SECONDARY}; background: transparent;")
-        self.lbl_header.setGeometry(8, 0, 120, 54)
+        self.lbl_header.setGeometry(8, 0, 100, 54)
         self.lbl_header.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+        # PR readout in upper-right (global x=989, y=133 -> local x=123, y=0)
+        self.pr_accent_bar = QFrame(self)
+        pr_bar_name = f"{object_name}_pr_bar"
+        self.pr_accent_bar.setObjectName(pr_bar_name)
+        self.pr_accent_bar.setGeometry(123, 5, BORDERS.VITAL_ACCENT_WIDTH, 58)
+        self.pr_accent_bar.setStyleSheet(
+            vital_accent_bar_qss(COLORS.ACCENT_PR, selector=f"#{pr_bar_name}")
+        )
+
+        self.lbl_pr_header = QLabel("PR", self)
+        self.lbl_pr_header.setObjectName(f"{object_name}_pr_header")
+        self.lbl_pr_header.setFont(font_from_token(TYPOGRAPHY.VITAL_HEADER))
+        self.lbl_pr_header.setStyleSheet(f"color: {COLORS.TEXT_SECONDARY}; background: transparent;")
+        self.lbl_pr_header.setGeometry(131, 0, 68, 54)
+        self.lbl_pr_header.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+        self.lbl_pr_value = QLabel("--", self)
+        self.lbl_pr_value.setObjectName(f"{object_name}_pr_value")
+        self.lbl_pr_value.setFont(font_from_token(TYPOGRAPHY.PR_VALUE))
+        self.lbl_pr_value.setStyleSheet(f"color: {COLORS.TEXT_PRIMARY}; background: transparent;")
+        self.lbl_pr_value.setGeometry(203, 8, 66, 46)
+        self.lbl_pr_value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+        self.lbl_pr_unit = QLabel("bpm", self)
+        self.lbl_pr_unit.setObjectName(f"{object_name}_pr_unit")
+        self.lbl_pr_unit.setFont(font_from_token(TYPOGRAPHY.PR_UNIT))
+        self.lbl_pr_unit.setStyleSheet(f"color: {COLORS.TEXT_SECONDARY}; background: transparent;")
+        self.lbl_pr_unit.setGeometry(268, 32, 46, 24)
+        self.lbl_pr_unit.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         # SYS block
         self.lbl_sys_title = QLabel("SYS", self)
@@ -395,6 +426,26 @@ class BPColumnWidget(QFrame):
         self.lbl_sys_value.setText(sys_txt)
         self.lbl_dia_value.setText(dia_txt)
 
+    def set_pr(
+        self,
+        bpm: int | float | None,
+        *,
+        stale: bool = False,
+    ) -> None:
+        if stale or not _is_finite_number(bpm):
+            pr_txt = "--"
+        else:
+            pr_txt = str(round(float(bpm)))  # type: ignore[arg-type]
+
+        _fit_font_size(
+            self.lbl_pr_value,
+            pr_txt,
+            max_width_px=self.lbl_pr_value.width() - 2,
+            steps=_PR_VALUE_SCALE_STEPS,
+            weight=TYPOGRAPHY.PR_VALUE.weight,
+        )
+        self.lbl_pr_value.setText(pr_txt)
+
     def update_bp(
         self,
         sys_mmhg: int | None,
@@ -412,6 +463,7 @@ class BPColumnWidget(QFrame):
         stale = _is_device_stale(status)
         alarm = snapshot.alarms.get("BP", AlarmLevel.NORMAL)
         self.set_bp(snapshot.bp_sys_mmhg, snapshot.bp_dia_mmhg, alarm=alarm, stale=stale)
+        self.set_pr(snapshot.bpm, stale=stale)
 
 
 __all__ = ["BPColumnWidget", "VitalColumnWidget"]

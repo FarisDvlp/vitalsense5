@@ -242,7 +242,6 @@ def test_f3_bottom_bar_geometry_and_labels(harness: h.AppHarness) -> None:
     expected = {
         "btn_patient": "PATIENT",
         "btn_settings": "SETTINGS",
-        "btn_save": "SAVE",
         "btn_record": "RECORD",
     }
     for name, label in expected.items():
@@ -252,6 +251,7 @@ def test_f3_bottom_bar_geometry_and_labels(harness: h.AppHarness) -> None:
         assert abs(btn.height() - 51) <= 4
         assert label in btn.text().upper()
 
+    assert harness.window.main_screen.findChild(object, "btn_save") is None
     btn_rec = h.find_widget(harness.window, "btn_record")
     assert h.region_has_color(btn_rec, "#FF7F7F", tolerance=20, min_pixels=50)
 
@@ -270,14 +270,20 @@ def test_f3_settings_button_opens_settings_modal(harness: h.AppHarness) -> None:
     assert modal is not None and modal.isVisible()
 
 
-def test_f3_save_button_invokes_session_command_and_feedback(harness: h.AppHarness) -> None:
-    before_count = len(harness.command_handler.save_calls)
-    h.click_widget(h.find_widget(harness.window, "btn_save"))
-    h.wait_until(lambda: len(harness.command_handler.save_calls) == before_count + 1, description="save call")
-    patient, snapshot = harness.command_handler.save_calls[-1]
-    assert patient is not None and patient.name == "Patient Number 1"
-    assert snapshot.spo2_percent == 98.0
-    assert h.find_widget(harness.window, "main_screen").isVisible()
+def test_f3_record_button_shows_recording_state_and_timer(harness: h.AppHarness) -> None:
+    btn_rec = h.find_widget(harness.window, "btn_record")
+    timer_lbl = h.find_widget(harness.window, "lbl_recording_timer")
+    assert not timer_lbl.isVisible()
+
+    h.click_widget(btn_rec)
+    h.wait_until(lambda: btn_rec.text() == "RECORDING...", description="recording label")
+    assert h.region_has_color(btn_rec, "#90FF93", tolerance=20, min_pixels=50)
+    assert timer_lbl.isVisible()
+    assert len(timer_lbl.text()) == 12
+
+    h.click_widget(btn_rec)
+    h.wait_until(lambda: btn_rec.text() == "RECORD", description="record reset")
+    assert not timer_lbl.isVisible()
 
 
 def test_f3_record_button_toggles_recording_start_and_stop(harness: h.AppHarness) -> None:
@@ -294,7 +300,7 @@ def test_f3_record_button_toggles_recording_start_and_stop(harness: h.AppHarness
     assert harness.command_handler.record_calls[1][0] is False
 
 
-@pytest.mark.parametrize("btn_name", ["btn_patient", "btn_settings", "btn_save"])
+@pytest.mark.parametrize("btn_name", ["btn_patient", "btn_settings"])
 def test_f3_neutral_buttons_show_figma_pressed_state(harness: h.AppHarness, btn_name: str) -> None:
     btn = h.find_widget(harness.window, btn_name)
     assert h.region_has_color(btn, "#D9D9D9", tolerance=20, min_pixels=40)
@@ -384,6 +390,7 @@ def test_f4_patient_screen_buttons_have_figma_dimensions(harness: h.AppHarness) 
     ps = h.find_widget(harness.window, "patient_screen")
     expected = {
         "btn_back": "BACK",
+        "btn_delete_patient": "DELETE",
         "btn_edit_patient": "EDIT PATIENT",
         "btn_new_patient": "NEW PATIENT",
     }
@@ -416,7 +423,9 @@ def test_f5_create_valid_patient_saves_to_store_and_updates_list(harness: h.AppH
     h.click_widget(h.find_widget(dlg, "btn_patient_save"))
     h.wait_until(lambda: h.find_overlay(harness, "new_patient_dialog", require_visible=True) is None, description="dialog close")
 
-    assert harness.patient_store.create_calls == [("John Doe", 36, 178, 70)]
+    assert harness.patient_store.create_calls == [
+        ("John Doe", 36, 178, 70, harness.contracts.Gender.MALE)
+    ]
     ps = h.find_widget(harness.window, "patient_screen")
     assert "John Doe" in " ".join(h.joined_text(c) for c in h.find_patient_cards(ps))
 
@@ -439,9 +448,9 @@ def test_f5_edit_valid_patient_updates_store_and_card(harness: h.AppHarness) -> 
     h.click_widget(h.find_widget(dlg, "btn_patient_save"))
     h.wait_until(lambda: len(harness.patient_store.update_calls) == 1, description="update call")
 
-    pid, name, age, height_cm, weight_kg = harness.patient_store.update_calls[0]
+    pid, name, age, height_cm, weight_kg, gender = harness.patient_store.update_calls[0]
     assert pid == "p-1" and name == "Jane Doe" and weight_kg == 62
-    assert age == 34 and height_cm == 170
+    assert age == 34 and height_cm == 170 and gender == harness.contracts.Gender.MALE
     cards_txt = " ".join(h.joined_text(c) for c in h.find_patient_cards(ps))
     assert "Jane Doe" in cards_txt and "62" in cards_txt
 
@@ -506,9 +515,9 @@ def test_f6_settings_modal_displays_all_8_slots(harness: h.AppHarness) -> None:
     modal = h.find_overlay(harness, "settings_modal", require_visible=True)
     assert modal is not None
 
-    card = h.find_modal_card(modal, 669, 383)
+    card = h.find_modal_card(modal, 669, 437)
     assert abs(card.width() - 669) <= 24
-    assert abs(card.height() - 383) <= 24
+    assert abs(card.height() - 437) <= 24
 
     scroll = h.find_widget(modal, "settings_scroll_area")
     for idx in range(1, 9):

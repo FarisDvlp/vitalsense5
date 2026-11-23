@@ -48,6 +48,7 @@ def load_contracts() -> SimpleNamespace:
         SensorState=_get("SensorState"),
         AlarmLevel=_get("AlarmLevel"),
         SettingControlType=_get("SettingControlType"),
+        Gender=_get("Gender"),
         VitalSnapshot=_get("VitalSnapshot"),
         WaveformBatch=_get("WaveformBatch"),
         DeviceStatus=_get("DeviceStatus"),
@@ -255,11 +256,21 @@ class FakePatientStore:
                 return patient
         raise KeyError(f"Unknown patient_id: {patient_id}")
 
-    def create_patient(self, name: str, age: int, height_cm: int, weight_kg: int) -> Any:
-        self.create_calls.append((name, age, height_cm, weight_kg))
+    def create_patient(
+        self,
+        name: str,
+        age: int,
+        height_cm: int,
+        weight_kg: int,
+        gender: Any | None = None,
+    ) -> Any:
+        resolved_gender = self._c.Gender.MALE if gender is None else gender
+        self.create_calls.append((name, age, height_cm, weight_kg, resolved_gender))
         pid = f"p-{self._next_seq}"
         self._next_seq += 1
-        rec = self._c.PatientRecord(pid, name, int(age), int(height_cm), int(weight_kg))
+        rec = self._c.PatientRecord(
+            pid, name, int(age), int(height_cm), int(weight_kg), resolved_gender
+        )
         self._patients.append(rec)
         self._active_id = pid
         return rec
@@ -271,15 +282,33 @@ class FakePatientStore:
         age: int,
         height_cm: int,
         weight_kg: int,
+        gender: Any | None = None,
     ) -> Any:
-        self.update_calls.append((patient_id, name, age, height_cm, weight_kg))
+        resolved_gender = self._c.Gender.MALE if gender is None else gender
+        self.update_calls.append(
+            (patient_id, name, age, height_cm, weight_kg, resolved_gender)
+        )
         for idx, patient in enumerate(self._patients):
             if patient.patient_id == patient_id:
                 updated = self._c.PatientRecord(
-                    patient_id, name, int(age), int(height_cm), int(weight_kg)
+                    patient_id,
+                    name,
+                    int(age),
+                    int(height_cm),
+                    int(weight_kg),
+                    resolved_gender,
                 )
                 self._patients[idx] = updated
                 return updated
+        raise KeyError(f"Unknown patient_id: {patient_id}")
+
+    def delete_patient(self, patient_id: str) -> None:
+        for idx, patient in enumerate(self._patients):
+            if patient.patient_id == patient_id:
+                self._patients.pop(idx)
+                if self._active_id == patient_id:
+                    self._active_id = self._patients[0].patient_id if self._patients else None
+                return
         raise KeyError(f"Unknown patient_id: {patient_id}")
 
 
@@ -320,7 +349,7 @@ class FakeSettingsStore:
     def list_settings(self) -> list[Any]:
         return list(self._slots)
 
-    def update_setting(self, slot_index: int, value: bool | str) -> Any:
+    def update_setting(self, slot_index: int, value: bool | str | int | float) -> Any:
         self.update_calls.append((slot_index, value))
         for idx, slot in enumerate(self._slots):
             if slot.slot_index == slot_index:

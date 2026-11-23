@@ -1,4 +1,4 @@
-"""Non-blocking 669x383 Settings modal overlay for SETTINGS 1..8."""
+"""Non-blocking 669x437 Settings modal overlay for SETTINGS 1..8."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def _dropdown_arrow_icon() -> QIcon:
 
 
 class SettingsModal(QFrame):
-    """669x383 Settings modal overlay with 8 scrollable generic slots."""
+    """669x437 Settings modal overlay with 8 scrollable generic slots."""
 
     closed = pyqtSignal()
     setting_changed = pyqtSignal(int, object)
@@ -131,21 +131,21 @@ class SettingsModal(QFrame):
             )
         )
 
-        # Header strip (0, 0, 669, 48) keeping DONE completely above scroll rows
+        # Header strip (0, 0, 669, 54) keeping DONE completely above scroll rows
         self._header = QWidget(self)
         self._header.setObjectName("settings_modal_header")
-        self._header.setGeometry(0, 0, LAYOUT.SETTINGS_MODAL_WIDTH, 48)
+        self._header.setGeometry(0, 0, LAYOUT.SETTINGS_MODAL_WIDTH, 54)
         self._header.setStyleSheet(
             "#settings_modal_header { background-color: transparent; border: none; }"
         )
 
         self.lbl_settings_title = QLabel("SETTINGS", self._header)
         self.lbl_settings_title.setObjectName("lbl_settings_title")
-        self.lbl_settings_title.setFont(jetbrains_mono_font(size_px=22, weight=600))
+        self.lbl_settings_title.setFont(font_from_token(TYPOGRAPHY.SETTINGS_TITLE))
         self.lbl_settings_title.setStyleSheet(
             f"color: {COLORS.TEXT_PRIMARY}; background: transparent;"
         )
-        self.lbl_settings_title.setGeometry(16, 8, 220, 32)
+        self.lbl_settings_title.setGeometry(13, 9, 240, 38)
         self.lbl_settings_title.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
@@ -153,16 +153,16 @@ class SettingsModal(QFrame):
         self.btn_settings_close = QPushButton("DONE", self._header)
         self.btn_settings_close.setObjectName("btn_settings_close")
         self.btn_settings_close.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.btn_settings_close.setGeometry(LAYOUT.SETTINGS_MODAL_WIDTH - 132, 2, 120, 44)
+        self.btn_settings_close.setGeometry(511, 12, 141, 36)
         self.btn_settings_close.setStyleSheet(
             f"#btn_settings_close {{"
             f" background-color: {COLORS.SETTINGS_PILL_BG};"
             f" color: {COLORS.TEXT_PRIMARY};"
-            f" border: 1px solid #B5B5B5;"
+            f" border: none;"
             f" border-radius: 10px;"
             f" font-family: '{FONT_FAMILY}';"
-            f" font-size: 18px;"
-            f" font-weight: 400;"
+            f" font-size: 20px;"
+            f" font-weight: 300;"
             f"}}"
             f"#btn_settings_close:pressed {{"
             f" background-color: {COLORS.BTN_PRESSED_BG};"
@@ -173,18 +173,18 @@ class SettingsModal(QFrame):
 
         self._header_divider = QFrame(self)
         self._header_divider.setObjectName("settings_header_divider")
-        self._header_divider.setGeometry(8, 48, 633, BORDERS.SETTINGS_DIVIDER_WIDTH)
+        self._header_divider.setGeometry(8, 54, 633, BORDERS.SETTINGS_DIVIDER_WIDTH)
         self._header_divider.setStyleSheet(
             f"#settings_header_divider {{ background-color: {COLORS.DIVIDER}; border: none; }}"
         )
 
-        # Scrollable rows container (0, 50, 661, 321) — 8 rows overflow 321px cleanly
+        # Scrollable rows container (0, 68, 661, 351) — scrollbar 13x351 at (648, 68)
         self.settings_scroll_area = TouchScrollArea(
             scrollbar_variant="settings",
             parent=self,
         )
         self.settings_scroll_area.setObjectName("settings_scroll_area")
-        self.settings_scroll_area.setGeometry(0, 50, 661, 321)
+        self.settings_scroll_area.setGeometry(0, 68, 661, 351)
         self.settings_scroll_area.setStyleSheet(
             "#settings_scroll_area { background-color: transparent; border: none; }"
         )
@@ -472,7 +472,7 @@ class SettingsModal(QFrame):
         btn_top_left = btn.mapTo(self, QPoint(0, 0))
         y_below = btn_top_left.y() + btn.height() + 4
         avail_below = self.height() - y_below - 8
-        avail_above = btn_top_left.y() - 52 - 4
+        avail_above = btn_top_left.y() - 56 - 4
 
         if needed_h <= avail_below:
             pop_y = y_below
@@ -487,7 +487,7 @@ class SettingsModal(QFrame):
         else:
             max_h = max(88, avail_above)
             pop_h = min(needed_h, max_h)
-            pop_y = max(52, btn_top_left.y() - pop_h - 4)
+            pop_y = max(56, btn_top_left.y() - pop_h - 4)
 
         has_scrollbar = needed_h > pop_h
         pop_w = max(180 if has_scrollbar else 168, btn.width())

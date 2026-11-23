@@ -604,8 +604,8 @@ def test_action_button_variants_and_held_pressed_state(qapp: QApplication) -> No
     assert _count_color(_grab(btn_rec), COLORS.BTN_DANGER_BG, tolerance=18) >= 100
 
     btn_rec.set_recording_active(True, elapsed_s=65)
-    assert btn_rec.text() == "REC 01:05"
-    assert _count_color(_grab(btn_rec), COLORS.ALARM_CRITICAL, tolerance=20) >= 100
+    assert btn_rec.text() == "RECORDING..."
+    assert _count_color(_grab(btn_rec), COLORS.BTN_SUCCESS_BG, tolerance=20) >= 100
 
     btn_rec.set_recording_active(False)
     assert btn_rec.text() == "RECORD"

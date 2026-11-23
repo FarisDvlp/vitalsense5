@@ -8,6 +8,7 @@ import math
 import threading
 
 from vitalsense5.contracts import (
+    Gender,
     PatientRecord,
     SettingControlType,
     SettingSlot,
@@ -26,7 +27,8 @@ def validate_patient_fields(
     age: int,
     height_cm: int,
     weight_kg: int,
-) -> tuple[str, int, int, int]:
+    gender: Gender | str = Gender.MALE,
+) -> tuple[str, int, int, int, Gender]:
     """Validate and normalize patient fields against clinical bounds."""
     if not isinstance(name, str) or not name.strip():
         raise ValueError("Patient name must be a non-empty string")
@@ -45,24 +47,38 @@ def validate_patient_fields(
             raise ValueError(f"{field_name} must be between {low} and {high}, got {raw_value}")
         validated_ints[field_name] = raw_value
 
+    if isinstance(gender, Gender):
+        valid_gender = gender
+    elif isinstance(gender, str):
+        norm = gender.strip().lower()
+        if norm == "male":
+            valid_gender = Gender.MALE
+        elif norm == "female":
+            valid_gender = Gender.FEMALE
+        else:
+            raise ValueError(f"gender must be 'Male' or 'Female', got {gender!r}")
+    else:
+        raise ValueError(f"gender must be Gender or str, got {gender!r}")
+
     return (
         cleaned_name,
         validated_ints["age"],
         validated_ints["height_cm"],
         validated_ints["weight_kg"],
+        valid_gender,
     )
 
 
 def _default_patients() -> list[PatientRecord]:
     return [
-        PatientRecord("p-1", "Patient Number 1", 34, 170, 68),
-        PatientRecord("p-2", "Patient Number 2", 42, 165, 60),
-        PatientRecord("p-3", "Patient Number 3", 28, 175, 72),
-        PatientRecord("p-4", "Patient Number 4", 51, 168, 74),
-        PatientRecord("p-5", "Patient Number 5", 39, 172, 66),
-        PatientRecord("p-6", "Patient Number 6", 46, 160, 58),
-        PatientRecord("p-7", "Patient Number 7", 63, 174, 79),
-        PatientRecord("p-8", "Patient Number 8", 24, 178, 70),
+        PatientRecord("p-1", "Patient Number 1", 34, 170, 68, Gender.MALE),
+        PatientRecord("p-2", "Patient Number 2", 42, 165, 60, Gender.FEMALE),
+        PatientRecord("p-3", "Patient Number 3", 28, 175, 72, Gender.MALE),
+        PatientRecord("p-4", "Patient Number 4", 51, 168, 74, Gender.FEMALE),
+        PatientRecord("p-5", "Patient Number 5", 39, 172, 66, Gender.MALE),
+        PatientRecord("p-6", "Patient Number 6", 46, 160, 58, Gender.FEMALE),
+        PatientRecord("p-7", "Patient Number 7", 63, 174, 79, Gender.MALE),
+        PatientRecord("p-8", "Patient Number 8", 24, 178, 70, Gender.FEMALE),
     ]
 
 
@@ -148,10 +164,11 @@ class InMemoryPatientStore:
         age: int,
         height_cm: int,
         weight_kg: int,
+        gender: Gender | str = Gender.MALE,
     ) -> PatientRecord:
         """Validate, store, and auto-activate a new patient record."""
-        cleaned_name, valid_age, valid_height, valid_weight = validate_patient_fields(
-            name, age, height_cm, weight_kg
+        cleaned_name, valid_age, valid_height, valid_weight, valid_gender = (
+            validate_patient_fields(name, age, height_cm, weight_kg, gender)
         )
         with self._lock:
             existing_ids = {p.patient_id for p in self._patients}
@@ -166,6 +183,7 @@ class InMemoryPatientStore:
                 valid_age,
                 valid_height,
                 valid_weight,
+                valid_gender,
             )
             self._patients.append(record)
             self._active_id = patient_id
@@ -178,6 +196,7 @@ class InMemoryPatientStore:
         age: int,
         height_cm: int,
         weight_kg: int,
+        gender: Gender | str = Gender.MALE,
     ) -> PatientRecord:
         """Validate and update an existing patient record, raising KeyError if unknown."""
         with self._lock:
@@ -189,8 +208,8 @@ class InMemoryPatientStore:
             if target_idx is None:
                 raise KeyError(f"Unknown patient_id: {patient_id!r}")
 
-            cleaned_name, valid_age, valid_height, valid_weight = validate_patient_fields(
-                name, age, height_cm, weight_kg
+            cleaned_name, valid_age, valid_height, valid_weight, valid_gender = (
+                validate_patient_fields(name, age, height_cm, weight_kg, gender)
             )
             updated = PatientRecord(
                 patient_id,
@@ -198,9 +217,25 @@ class InMemoryPatientStore:
                 valid_age,
                 valid_height,
                 valid_weight,
+                valid_gender,
             )
             self._patients[target_idx] = updated
             return updated
+
+    def delete_patient(self, patient_id: str) -> None:
+        """Delete a patient record by ID, falling back active patient if needed."""
+        with self._lock:
+            target_idx: int | None = None
+            for idx, patient in enumerate(self._patients):
+                if patient.patient_id == patient_id:
+                    target_idx = idx
+                    break
+            if target_idx is None:
+                raise KeyError(f"Unknown patient_id: {patient_id!r}")
+
+            self._patients.pop(target_idx)
+            if self._active_id == patient_id:
+                self._active_id = self._patients[0].patient_id if self._patients else None
 
 
 class InMemorySettingsStore:

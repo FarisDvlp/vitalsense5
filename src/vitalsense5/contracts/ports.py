@@ -6,6 +6,7 @@ from typing import Protocol, runtime_checkable
 
 from .models import (
     DeviceStatus,
+    Gender,
     PatientRecord,
     SettingSlot,
     VitalSnapshot,
@@ -51,6 +52,7 @@ class PatientStorePort(Protocol):
         age: int,
         height_cm: int,
         weight_kg: int,
+        gender: Gender = Gender.MALE,
     ) -> PatientRecord: ...
 
     def update_patient(
@@ -60,7 +62,10 @@ class PatientStorePort(Protocol):
         age: int,
         height_cm: int,
         weight_kg: int,
+        gender: Gender = Gender.MALE,
     ) -> PatientRecord: ...
+
+    def delete_patient(self, patient_id: str) -> None: ...
 
 
 @runtime_checkable
@@ -69,7 +74,9 @@ class SettingsPort(Protocol):
 
     def list_settings(self) -> list[SettingSlot]: ...
 
-    def update_setting(self, slot_index: int, value: bool | str) -> SettingSlot: ...
+    def update_setting(
+        self, slot_index: int, value: bool | str | int | float
+    ) -> SettingSlot: ...
 
 
 @runtime_checkable

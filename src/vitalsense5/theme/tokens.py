@@ -38,6 +38,7 @@ class Palette:
     # Text & Dividers
     TEXT_PRIMARY: str = "#000000"
     TEXT_SECONDARY: str = "#494949"
+    TIMER_TEXT: str = "#868686"
     INPUT_PLACEHOLDER: str = "#919191"
     DIVIDER: str = "#000000"
 
@@ -53,6 +54,7 @@ class Palette:
     ACCENT_PI: str = "#B369D3"
     ACCENT_SPO2: str = "#64C25E"
     ACCENT_BP: str = "#4E54A7"
+    ACCENT_PR: str = "#B81D1D"
     BRAND_BLUE: str = "#226DAA"
     BRAND_CYAN: str = "#1EB5D7"
 
@@ -148,7 +150,7 @@ class Layout:
 
     # Modals (Settings & New/Edit Patient Pop Up)
     SETTINGS_MODAL_WIDTH: int = 669
-    SETTINGS_MODAL_HEIGHT: int = 383
+    SETTINGS_MODAL_HEIGHT: int = 437
     SETTINGS_ROW_HEIGHT: int = 48
     SETTINGS_DIVIDER_WIDTH: int = 633
     SETTINGS_PILL_HEIGHT: int = 31
@@ -158,7 +160,8 @@ class Layout:
     NEW_PATIENT_MODAL_WIDTH: int = 875
     NEW_PATIENT_MODAL_HEIGHT: int = 231
     INPUT_PILL_HEIGHT: int = 59
-    INPUT_NAME_WIDTH: int = 839
+    INPUT_NAME_WIDTH: int = 552
+    INPUT_GENDER_WIDTH: int = 264
     INPUT_METRIC_WIDTH: int = 264
 
     # Touch Ergonomics
@@ -184,18 +187,23 @@ class Typography:
     VITAL_VALUE_BP: FontToken = FontToken(64, 300, 0.0)
     VITAL_HEADER: FontToken = FontToken(48, 200, 0.0)
     BATTERY_PCT: FontToken = FontToken(36, 200, 0.0)
+    PR_VALUE: FontToken = FontToken(36, 200, 0.0)
     SCREEN_TITLE: FontToken = FontToken(32, 700, 0.0)
+    SETTINGS_TITLE: FontToken = FontToken(32, 400, 0.0)
     HEADER_DATETIME: FontToken = FontToken(32, 300, 0.0)
     PATIENT_CARD_NAME: FontToken = FontToken(32, 300, 0.0)
     VITAL_UNIT_LARGE: FontToken = FontToken(32, 200, 0.0)
     BP_SUBLABEL_UNIT: FontToken = FontToken(24, 200, 0.0)
     ACTION_BUTTON: FontToken = FontToken(24, 300, 0.0)
+    RECORDING_TIMER: FontToken = FontToken(24, 300, 0.0)
     SETTINGS_LABEL: FontToken = FontToken(24, 300, 0.0)
+    SETTINGS_DONE: FontToken = FontToken(20, 300, 0.0)
     PRV_SUBLABEL: FontToken = FontToken(20, 200, 0.0)
     HEADER_PATIENT: FontToken = FontToken(20, 200, 0.0)
     INPUT_TEXT: FontToken = FontToken(20, 200, 0.0)
     PATIENT_CARD_META: FontToken = FontToken(20, 300, 0.0)
     CONNECTION_STATUS: FontToken = FontToken(16, 200, 0.0)
+    PR_UNIT: FontToken = FontToken(16, 200, 0.0)
     SETTINGS_CONTROL: FontToken = FontToken(16, 300, 0.0)
 
 

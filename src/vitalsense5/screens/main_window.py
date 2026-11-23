@@ -38,7 +38,7 @@ from vitalsense5.widgets import KeyboardMode, VirtualKeyboardOverlay
 
 from .main_screen import MainScreen
 from .new_patient_dialog import NewPatientDialog
-from .patient_screen import PatientScreen
+from .patient_screen import ConfirmDeleteDialog, PatientScreen
 from .settings_modal import SettingsModal
 
 
@@ -123,6 +123,9 @@ class MainWindow(QMainWindow):
         )
         self.new_patient_dialog.hide()
 
+        self.confirm_delete_dialog = ConfirmDeleteDialog(parent=self.modal_scrim)
+        self.confirm_delete_dialog.hide()
+
         # Non-blocking toast banner in the 274px gap between SETTINGS and SAVE
         self.toast_banner = QLabel("", self._central_host)
         self.toast_banner.setObjectName("toast_banner")
@@ -167,11 +170,11 @@ class MainWindow(QMainWindow):
     def _wire_signals(self) -> None:
         self.main_screen.patient_requested.connect(self._show_patient_screen)
         self.main_screen.settings_requested.connect(self.open_settings_modal)
-        self.main_screen.save_requested.connect(self._on_save_clicked)
         self.main_screen.record_requested.connect(self._on_record_clicked)
 
         self.patient_screen.back_requested.connect(self._show_main_screen)
         self.patient_screen.patient_selected.connect(self._on_patient_selected)
+        self.patient_screen.delete_patient_requested.connect(self.open_delete_patient_dialog)
         self.patient_screen.new_patient_requested.connect(self.open_new_patient_dialog)
         self.patient_screen.edit_patient_requested.connect(self.open_edit_patient_dialog)
 
@@ -180,6 +183,9 @@ class MainWindow(QMainWindow):
 
         self.new_patient_dialog.cancelled.connect(self.close_active_modal)
         self.new_patient_dialog.saved.connect(self._on_patient_saved)
+
+        self.confirm_delete_dialog.cancelled.connect(self.close_active_modal)
+        self.confirm_delete_dialog.confirmed.connect(self._on_delete_patient_confirmed)
 
         self.virtual_keyboard.keyboard_shown.connect(self._on_keyboard_shown)
         self.virtual_keyboard.keyboard_hidden.connect(self._on_keyboard_hidden)
@@ -359,7 +365,7 @@ class MainWindow(QMainWindow):
             x = max(0, (scrim_w - w) // 2)
             centered_y = max(0, (scrim_h - h) // 2)
             if kb_visible:
-                y = max(12, min(centered_y, kb_top_in_scrim - h - 12))
+                y = max(0, min(centered_y, kb_top_in_scrim - h - 2))
             else:
                 y = centered_y
             self.settings_modal.move(x, y)
@@ -374,14 +380,22 @@ class MainWindow(QMainWindow):
             x = max(0, (scrim_w - w) // 2)
             centered_y = max(0, (scrim_h - h) // 2)
             if kb_visible:
-                y = max(12, min(centered_y, kb_top_in_scrim - h - 12))
+                y = max(0, min(centered_y, kb_top_in_scrim - h - 2))
             else:
                 y = centered_y
             self.new_patient_dialog.move(x, y)
 
+        if self.confirm_delete_dialog.isVisible():
+            w = self.confirm_delete_dialog.width()
+            h = self.confirm_delete_dialog.height()
+            x = max(0, (scrim_w - w) // 2)
+            y = max(0, (scrim_h - h) // 2)
+            self.confirm_delete_dialog.move(x, y)
+
     def open_settings_modal(self) -> None:
         self._hide_keyboard()
         self.new_patient_dialog.hide()
+        self.confirm_delete_dialog.hide()
         self.settings_modal.load_settings()
         self._active_modal = self.settings_modal
         self.modal_scrim.show()
@@ -392,8 +406,12 @@ class MainWindow(QMainWindow):
         self._layout_stage_and_overlays()
 
     def open_new_patient_dialog(self) -> None:
+        if self._recording_active:
+            self._show_toast("Cannot add patient while recording", level="warning")
+            return
         self._hide_keyboard()
         self.settings_modal.hide()
+        self.confirm_delete_dialog.hide()
         self.new_patient_dialog.open_create()
         self._active_modal = self.new_patient_dialog
         self.modal_scrim.show()
@@ -410,6 +428,7 @@ class MainWindow(QMainWindow):
             return
         self._hide_keyboard()
         self.settings_modal.hide()
+        self.confirm_delete_dialog.hide()
         self.new_patient_dialog.open_edit(active)
         self._active_modal = self.new_patient_dialog
         self.modal_scrim.show()
@@ -419,10 +438,30 @@ class MainWindow(QMainWindow):
         self.virtual_keyboard.raise_()
         self._layout_stage_and_overlays()
 
+    def open_delete_patient_dialog(self) -> None:
+        if self._recording_active:
+            self._show_toast("Cannot delete patient while recording", level="warning")
+            return
+        active = self._safe_get_active_patient()
+        if active is None:
+            self._show_toast("No active patient selected", level="warning")
+            return
+        self._hide_keyboard()
+        self.settings_modal.hide()
+        self.new_patient_dialog.hide()
+        self.confirm_delete_dialog.open_for_patient(active)
+        self._active_modal = self.confirm_delete_dialog
+        self.modal_scrim.show()
+        self.modal_scrim.raise_()
+        self.confirm_delete_dialog.show()
+        self.confirm_delete_dialog.raise_()
+        self._layout_stage_and_overlays()
+
     def close_active_modal(self) -> None:
         self._hide_keyboard()
         self.settings_modal.hide()
         self.new_patient_dialog.hide()
+        self.confirm_delete_dialog.hide()
         self.modal_scrim.hide()
         self._active_modal = None
 
@@ -451,6 +490,16 @@ class MainWindow(QMainWindow):
         self.patient_screen.set_patients(patients, active_id)
 
     def _on_patient_selected(self, patient_id: str) -> None:
+        if self._recording_active:
+            active = self._safe_get_active_patient()
+            if active is not None and active.patient_id == patient_id:
+                return
+            self._show_toast("Cannot change patient while recording", level="warning")
+            self.patient_screen.set_selected_patient(
+                active.patient_id if active is not None else None
+            )
+            return
+
         try:
             record = self._patient_store.set_active_patient(patient_id)
         except Exception as exc:
@@ -459,28 +508,26 @@ class MainWindow(QMainWindow):
 
         self.main_screen.set_active_patient(record)
         self.patient_screen.set_selected_patient(record.patient_id)
+
+    def _on_delete_patient_confirmed(self, patient_id: str) -> None:
         if self._recording_active:
-            self._show_toast(
-                f"Recording active — switched to {record.name}",
-                level="warning",
-            )
+            self.close_active_modal()
+            self._show_toast("Cannot delete patient while recording", level="warning")
+            return
+        try:
+            self._patient_store.delete_patient(patient_id)
+        except Exception as exc:
+            self.close_active_modal()
+            self._show_toast(str(exc) or "Failed to delete patient", level="error")
+            return
+        self.close_active_modal()
+        self._refresh_patient_bindings()
+        self._show_toast("Patient deleted", level="info")
 
     def _on_patient_saved(self, record: PatientRecord) -> None:
         self.close_active_modal()
         self._refresh_patient_bindings()
         self._show_toast(f"Saved {record.name}", level="success")
-
-    def _on_save_clicked(self) -> None:
-        active = self._safe_get_active_patient()
-        try:
-            ok, msg = self._command_handler.save_snapshot(active, self._latest_vitals)
-        except Exception as exc:
-            self._show_toast(f"Save failed: {exc}", level="error")
-            return
-        self._show_toast(
-            msg or ("Snapshot saved" if ok else "Snapshot failed"),
-            level="success" if ok else "error",
-        )
 
     def _on_record_clicked(self) -> None:
         next_active = not self._recording_active
@@ -567,13 +614,13 @@ class MainWindow(QMainWindow):
             pass
 
         if self._recording_active:
-            if status.recording_active and status.recording_elapsed_s > 0:
-                elapsed = status.recording_elapsed_s
-            elif self._recording_started_at is not None:
-                elapsed = max(0, int(time.monotonic() - self._recording_started_at))
+            if self._recording_started_at is not None:
+                elapsed_ms = max(0, int((time.monotonic() - self._recording_started_at) * 1000))
+            elif status.recording_active and status.recording_elapsed_s > 0:
+                elapsed_ms = int(status.recording_elapsed_s) * 1000
             else:
-                elapsed = 0
-            self.main_screen.set_recording_active(True, elapsed)
+                elapsed_ms = 0
+            self.main_screen.set_recording_active(True, elapsed_ms=elapsed_ms)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
         etype = event.type()
@@ -610,6 +657,8 @@ class MainWindow(QMainWindow):
                     if not self._active_modal.geometry().contains(pos):
                         if self._active_modal is self.settings_modal:
                             self.settings_modal.request_close()
+                        elif self._active_modal is self.confirm_delete_dialog:
+                            self.close_active_modal()
                         elif self.virtual_keyboard.isVisible():
                             self._hide_keyboard()
                 return True
@@ -628,6 +677,13 @@ class MainWindow(QMainWindow):
                 return
             if self._active_modal is self.settings_modal and self.settings_modal.isVisible():
                 self.settings_modal.request_close()
+                event.accept()
+                return
+            if (
+                self._active_modal is self.confirm_delete_dialog
+                and self.confirm_delete_dialog.isVisible()
+            ):
+                self.close_active_modal()
                 event.accept()
                 return
         super().keyPressEvent(event)

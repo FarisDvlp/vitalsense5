@@ -564,3 +564,32 @@ def test_in_memory_settings_store_numeric_and_invalid_value_types() -> None:
     for bad_val in (float("nan"), float("inf"), float("-inf"), True, ["bad"]):
         with pytest.raises(ValueError):
             store.update_setting(3, bad_val)  # type: ignore[arg-type]
+
+
+def test_in_memory_patient_store_gender_and_delete_fallback() -> None:
+    from vitalsense5.contracts import Gender
+
+    store = InMemoryPatientStore()
+    created = store.create_patient("Amina", 27, 160, 54, gender=Gender.FEMALE)
+    assert created.gender == Gender.FEMALE
+    assert store.get_active_patient() == created
+
+    updated = store.update_patient(created.patient_id, "Amina", 28, 161, 55, gender="Male")
+    assert updated.gender == Gender.MALE
+
+    with pytest.raises(ValueError):
+        store.create_patient("Bad", 30, 170, 65, gender="Other")
+
+    # Deleting active patient falls back to first remaining patient
+    store.delete_patient(created.patient_id)
+    assert store.get_active_patient() is not None
+    assert store.get_active_patient().patient_id == "p-1"
+
+    with pytest.raises(KeyError):
+        store.delete_patient("p-nonexistent")
+
+    # Deleting all patients leaves get_active_patient() == None
+    for p in list(store.list_patients()):
+        store.delete_patient(p.patient_id)
+    assert store.list_patients() == []
+    assert store.get_active_patient() is None

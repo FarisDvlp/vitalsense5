@@ -108,15 +108,16 @@ def test_w02_live_icu_monitoring_settings_and_snapshot_record_session(harness: h
     assert "Option B" in h.joined_text(h.find_widget(modal_reopen, "settings_row_4"))
     h.click_widget(h.find_widget(modal_reopen, "btn_settings_close"))
 
-    h.click_widget(h.find_widget(harness.window, "btn_save"))
-    assert len(harness.command_handler.save_calls) == 1
-
     btn_rec = h.find_widget(harness.window, "btn_record")
     h.click_widget(btn_rec)
     harness.vital_port.set_status(recording_active=True, recording_elapsed_s=4)
     h.pump_events(150)
+    assert btn_rec.text() == "RECORDING..."
+    assert h.find_widget(harness.window, "lbl_recording_timer").isVisible()
     h.click_widget(btn_rec)
     assert [c[0] for c in harness.command_handler.record_calls] == [True, False]
+    assert btn_rec.text() == "RECORD"
+    assert not h.find_widget(harness.window, "lbl_recording_timer").isVisible()
 
 
 def test_w03_large_ward_drag_scroll_selection_and_edit_roundtrip(make_app: object) -> None:

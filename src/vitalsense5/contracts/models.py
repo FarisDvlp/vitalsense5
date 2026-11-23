@@ -49,6 +49,13 @@ class SettingControlType(Enum):
     DROPDOWN = "dropdown"
 
 
+class Gender(Enum):
+    """Patient biological sex / gender selection."""
+
+    MALE = "Male"
+    FEMALE = "Female"
+
+
 @dataclass(frozen=True)
 class VitalSnapshot:
     """Latest vital sign measurements and per-parameter alarm states."""
@@ -98,6 +105,7 @@ class PatientRecord:
     age: int
     height_cm: int
     weight_kg: int
+    gender: Gender = Gender.MALE
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,7 @@ __all__ = [
     "CloudState",
     "ConnectionState",
     "DeviceStatus",
+    "Gender",
     "PatientRecord",
     "SensorState",
     "SettingControlType",

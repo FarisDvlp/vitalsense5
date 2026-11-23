@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from vitalsense5.contracts import DeviceStatus, PatientRecord, VitalSnapshot, WaveformBatch
-from vitalsense5.theme import COLORS, LAYOUT
+from vitalsense5.theme import COLORS, LAYOUT, TYPOGRAPHY, font_from_token
 from vitalsense5.widgets import (
     ActionButton,
     BPColumnWidget,
@@ -23,7 +23,6 @@ class MainScreen(QWidget):
 
     patient_requested = pyqtSignal()
     settings_requested = pyqtSignal()
-    save_requested = pyqtSignal()
     record_requested = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -50,7 +49,7 @@ class MainScreen(QWidget):
             accent_color=COLORS.ACCENT_PRV,
             object_name="vital_prv",
             sublabel="RMSSD",
-            show_bpm=True,
+            show_bpm=False,
             width_px=178,
             height_px=195,
             parent=self,
@@ -138,13 +137,18 @@ class MainScreen(QWidget):
         )
         self.btn_settings.move(293, 628)
 
-        self.btn_save = ActionButton(
-            "SAVE",
-            variant="default",
-            object_name="btn_save",
-            parent=self,
+        # Live recording session timer HH:mm:ss.SSS right-aligned at x=997, y=638
+        self.lbl_recording_timer = QLabel("", self)
+        self.lbl_recording_timer.setObjectName("lbl_recording_timer")
+        self.lbl_recording_timer.setGeometry(777, 638, 220, 32)
+        self.lbl_recording_timer.setFont(font_from_token(TYPOGRAPHY.RECORDING_TIMER))
+        self.lbl_recording_timer.setStyleSheet(
+            f"color: {COLORS.TIMER_TEXT}; background: transparent;"
         )
-        self.btn_save.move(779, 628)
+        self.lbl_recording_timer.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.lbl_recording_timer.hide()
 
         self.btn_record = ActionButton(
             "RECORD",
@@ -156,7 +160,6 @@ class MainScreen(QWidget):
 
         self.btn_patient.clicked.connect(self.patient_requested.emit)
         self.btn_settings.clicked.connect(self.settings_requested.emit)
-        self.btn_save.clicked.connect(self.save_requested.emit)
         self.btn_record.clicked.connect(self.record_requested.emit)
 
     def update_vitals(
@@ -179,8 +182,33 @@ class MainScreen(QWidget):
             patient.name if patient is not None else None
         )
 
-    def set_recording_active(self, active: bool, elapsed_s: int = 0) -> None:
-        self.btn_record.set_recording_active(active, elapsed_s)
+    def set_recording_active(
+        self,
+        active: bool,
+        elapsed_s: int | float = 0,
+        *,
+        elapsed_ms: int | None = None,
+    ) -> None:
+        self.btn_record.set_recording_active(active, int(elapsed_s))
+        if active:
+            total_ms = (
+                max(0, int(elapsed_ms))
+                if elapsed_ms is not None
+                else max(0, round(float(elapsed_s) * 1000))
+            )
+            millis = total_ms % 1000
+            total_s = total_ms // 1000
+            secs = total_s % 60
+            total_m = total_s // 60
+            mins = total_m % 60
+            hours = total_m // 60
+            self.lbl_recording_timer.setText(
+                f"{hours:02d}:{mins:02d}:{secs:02d}.{millis:03d}"
+            )
+            self.lbl_recording_timer.show()
+        else:
+            self.lbl_recording_timer.setText("")
+            self.lbl_recording_timer.hide()
 
     def refresh_clock(self, now: datetime | None = None) -> None:
         self.header_bar.refresh_clock(now)

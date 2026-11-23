@@ -28,6 +28,7 @@ from vitalsense5.contracts import (
     CloudState,
     ConnectionState,
     DeviceStatus,
+    Gender,
     PatientRecord,
     SensorState,
     SettingControlType,
@@ -245,7 +246,11 @@ def test_main_screen_geometry_zero_overlap_and_button_colors(qapp: QApplication)
     assert ms.objectName() == "main_screen"
     assert ms.ppg_canvas.geometry() == QRect(80, 348, 1124, 250)
 
-    # Verify zero pairwise overlap across header, 5 vital columns, PPG canvas, and 4 bottom buttons
+    # Verify zero pairwise overlap across header, 5 vital columns, PPG canvas, and 3 bottom buttons
+    assert not hasattr(ms, "btn_save")
+    assert ms.vital_prv.lbl_bpm is None
+    assert ms.vital_bp.lbl_pr_header.text() == "PR"
+    assert ms.vital_bp.lbl_pr_unit.text() == "bpm"
     items = [
         ms.header_bar,
         ms.vital_prv,
@@ -256,7 +261,7 @@ def test_main_screen_geometry_zero_overlap_and_button_colors(qapp: QApplication)
         ms.ppg_canvas,
         ms.btn_patient,
         ms.btn_settings,
-        ms.btn_save,
+        ms.lbl_recording_timer,
         ms.btn_record,
     ]
     for i, a in enumerate(items):
@@ -267,10 +272,10 @@ def test_main_screen_geometry_zero_overlap_and_button_colors(qapp: QApplication)
                 f"Overlap between {a.objectName()} and {b.objectName()}: {inter}"
             )
 
-    # MainScreen btn_save uses default (#D9D9D9), btn_record uses danger (#FF7F7F)
-    assert ms.btn_save.variant == "default"
+    # MainScreen btn_patient/btn_settings use default (#D9D9D9), btn_record uses danger (#FF7F7F)
+    assert ms.btn_patient.variant == "default"
     assert ms.btn_record.variant == "danger"
-    assert _count_color(_grab(ms.btn_save), COLORS.BTN_DEFAULT_BG, stride=2) >= 50
+    assert _count_color(_grab(ms.btn_patient), COLORS.BTN_DEFAULT_BG, stride=2) >= 50
     assert _count_color(_grab(ms.btn_record), COLORS.BTN_DANGER_BG, stride=2) >= 50
 
     win.close()
@@ -292,6 +297,7 @@ def test_polling_resilience_decoupled_recording_and_save_toast(qapp: QApplicatio
 
     assert port.started
     assert win.main_screen.vital_prv.lbl_value.text() == "72"
+    assert win.main_screen.vital_bp.lbl_pr_value.text() == "68"
 
     # Transient exceptions during poll do not crash UI
     port.raise_on_poll = True
@@ -304,32 +310,31 @@ def test_polling_resilience_decoupled_recording_and_save_toast(qapp: QApplicatio
     QApplication.processEvents()
     assert cmd.record_calls == [True]
     assert win.main_screen.btn_record.text() == "RECORD"
+    assert not win.main_screen.lbl_recording_timer.isVisible()
 
     # Accepted toggle_recording stays active even when port.device_status().recording_active is False
     cmd.allow_record = True
     QTest.mouseClick(win.main_screen.btn_record, Qt.MouseButton.LeftButton)
     QApplication.processEvents()
-    assert win.main_screen.btn_record.text().startswith("REC ")
+    assert win.main_screen.btn_record.text() == "RECORDING..."
+    assert win.main_screen.lbl_recording_timer.isVisible()
+    assert len(win.main_screen.lbl_recording_timer.text()) == 12
     win._on_poll_tick()
-    assert win.main_screen.btn_record.text().startswith("REC ")
-
-    # SAVE shows non-blocking toast without overlapping buttons or PPG
-    QTest.mouseClick(win.main_screen.btn_save, Qt.MouseButton.LeftButton)
-    QApplication.processEvents()
-    assert cmd.save_calls == 1
+    assert win.main_screen.btn_record.text() == "RECORDING..."
     assert win.toast_banner.isVisible()
-    assert "Saved" in win.toast_banner.text()
-    for btn in (
+    for w in (
         win.main_screen.btn_settings,
-        win.main_screen.btn_save,
+        win.main_screen.lbl_recording_timer,
+        win.main_screen.btn_record,
         win.main_screen.ppg_canvas,
     ):
-        assert not win.toast_banner.geometry().intersects(btn.geometry())
+        assert not win.toast_banner.geometry().intersects(w.geometry())
 
     # Toggle recording off cleanly
     QTest.mouseClick(win.main_screen.btn_record, Qt.MouseButton.LeftButton)
     QApplication.processEvents()
     assert win.main_screen.btn_record.text() == "RECORD"
+    assert not win.main_screen.lbl_recording_timer.isVisible()
 
     win.close()
     assert port.stopped
@@ -514,7 +519,9 @@ def test_settings_modal_controls_scroll_popover_and_shift(qapp: QApplication) ->
     sm = win.settings_modal
     assert sm.isVisible()
     assert win.modal_scrim.isVisible()
-    assert sm.width() == 669 and sm.height() == 383
+    assert sm.width() == 669 and sm.height() == 437
+    assert sm.lbl_settings_title.text() == "SETTINGS"
+    assert sm.btn_settings_close.geometry() == QRect(511, 12, 141, 36)
     assert sm.settings_scroll_area.verticalScrollBar().maximum() > 0
 
     # btn_settings_close is in header and does not overlap scroll rows
@@ -913,4 +920,154 @@ def test_patient_card_drag_clears_internal_pressed_flag(qapp: QApplication) -> N
     QTest.mouseRelease(card1, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(start.x(), start.y() - 40))
     QApplication.processEvents()
     assert card1._pressed is False  # noqa: SLF001
+    win.close()
+
+
+def test_patient_delete_confirmation_and_recording_guards(qapp: QApplication) -> None:
+    store = InMemoryPatientStore()
+    win = create_app(patient_store=store, kiosk=False, tick_ms=100)
+    win.show()
+    QApplication.processEvents()
+
+    # Navigate to PatientScreen
+    QTest.mouseClick(win.main_screen.btn_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    ps = win.patient_screen
+    assert ps.btn_delete_patient.geometry() == QRect(572, 628, 212, 51)
+    assert ps.btn_delete_patient.isEnabled()
+
+    # Clicking DELETE opens non-blocking confirmation modal; CANCEL aborts deletion
+    initial_count = len(store.list_patients())
+    QTest.mouseClick(ps.btn_delete_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert win.confirm_delete_dialog.isVisible()
+    assert win.modal_scrim.isVisible()
+    QTest.mouseClick(win.confirm_delete_dialog.btn_confirm_cancel, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert not win.confirm_delete_dialog.isVisible()
+    assert len(store.list_patients()) == initial_count
+
+    # Confirming DELETE removes active patient and falls back active patient
+    QTest.mouseClick(ps.btn_delete_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    QTest.mouseClick(win.confirm_delete_dialog.btn_confirm_delete, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert not win.confirm_delete_dialog.isVisible()
+    assert len(store.list_patients()) == initial_count - 1
+    assert store.get_active_patient() is not None
+    assert store.get_active_patient().patient_id == "p-2"
+
+    # Start recording on MainScreen
+    QTest.mouseClick(ps.btn_back, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    QTest.mouseClick(win.main_screen.btn_record, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert win._recording_active is True  # noqa: SLF001
+
+    # Navigate to PatientScreen while recording is active
+    QTest.mouseClick(win.main_screen.btn_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+
+    # Guard 1: Patient switch is blocked while recording
+    card_other = ps._cards[1]  # noqa: SLF001
+    QTest.mouseClick(card_other, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert store.get_active_patient().patient_id == "p-2"
+    assert win.toast_banner.isVisible()
+    assert "Cannot change patient while recording" in win.toast_banner.text()
+
+    # Guard 2: Patient deletion is blocked while recording
+    QTest.mouseClick(ps.btn_delete_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert not win.confirm_delete_dialog.isVisible()
+    assert len(store.list_patients()) == initial_count - 1
+    assert win.toast_banner.isVisible()
+    assert "Cannot delete patient while recording" in win.toast_banner.text()
+
+    # Guard 3: Creating a new patient is blocked while recording (would switch active patient)
+    QTest.mouseClick(ps.btn_new_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert not win.new_patient_dialog.isVisible()
+    assert store.get_active_patient().patient_id == "p-2"
+    assert win.toast_banner.isVisible()
+    assert "Cannot add patient while recording" in win.toast_banner.text()
+
+    # ConfirmDeleteDialog elides very long names cleanly
+    win.confirm_delete_dialog.open_for_patient(
+        PatientRecord("p-long", "A" * 80, 30, 170, 65, Gender.MALE)
+    )
+    assert "…" in win.confirm_delete_dialog.lbl_confirm_message.text()
+
+    win.close()
+
+
+def test_new_patient_dialog_gender_create_and_edit(qapp: QApplication) -> None:
+    store = InMemoryPatientStore()
+    win = create_app(patient_store=store, kiosk=False, tick_ms=100)
+    win.show()
+    QApplication.processEvents()
+
+    QTest.mouseClick(win.main_screen.btn_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    QTest.mouseClick(win.patient_screen.btn_new_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+
+    dlg = win.new_patient_dialog
+    assert dlg.input_patient_name.geometry() == QRect(19, 20, 552, 59)
+    assert dlg.btn_patient_gender.geometry() == QRect(595, 20, 264, 59)
+    assert dlg.btn_patient_gender.text() == "Male"
+
+    # Select Female via gender popover
+    QTest.mouseClick(dlg.btn_patient_gender, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert dlg._gender_popover.isVisible()  # noqa: SLF001
+    QTest.mouseClick(dlg._gender_option_buttons[Gender.FEMALE], Qt.MouseButton.LeftButton)  # noqa: SLF001
+    QApplication.processEvents()
+    assert not dlg._gender_popover.isVisible()  # noqa: SLF001
+    assert dlg.btn_patient_gender.text() == "Female"
+    assert dlg.selected_gender() == Gender.FEMALE
+
+    dlg.input_patient_name.setText("Siti")
+    dlg.input_patient_age.setText("31")
+    dlg.input_patient_height.setText("162")
+    dlg.input_patient_weight.setText("56")
+    QTest.mouseClick(dlg.btn_patient_save, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+
+    created = store.get_active_patient()
+    assert created is not None
+    assert created.name == "Siti"
+    assert created.gender == Gender.FEMALE
+    last_card = win.patient_screen._cards[-1]  # noqa: SLF001
+    assert "Gender: Female" in last_card.lbl_meta.text()
+    assert "…" not in last_card.lbl_meta.text()
+
+    # Edit preserves and updates gender
+    QTest.mouseClick(win.patient_screen.btn_edit_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert dlg.btn_patient_gender.text() == "Female"
+    QTest.mouseClick(dlg.btn_patient_gender, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    QTest.mouseClick(dlg._gender_option_buttons[Gender.MALE], Qt.MouseButton.LeftButton)  # noqa: SLF001
+    QApplication.processEvents()
+    QTest.mouseClick(dlg.btn_patient_save, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+
+    updated = store.get_active_patient()
+    assert updated is not None and updated.gender == Gender.MALE
+    assert "Gender: Male" in win.patient_screen._cards[-1].lbl_meta.text()  # noqa: SLF001
+
+    # fit_to_width(<875) with gender popover open keeps popover aligned inside compact dialog
+    QTest.mouseClick(win.patient_screen.btn_new_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    QTest.mouseClick(dlg.btn_patient_gender, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert dlg._gender_popover.isVisible()  # noqa: SLF001
+    dlg.fit_to_width(580)
+    QApplication.processEvents()
+    assert dlg.width() == 580
+    assert dlg.rect().contains(dlg._gender_popover.geometry())  # noqa: SLF001
+    assert dlg._gender_popover.x() == dlg.btn_patient_gender.x()  # noqa: SLF001
+    assert dlg._gender_popover.width() == dlg.btn_patient_gender.width()  # noqa: SLF001
+
     win.close()
