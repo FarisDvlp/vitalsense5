@@ -12,6 +12,7 @@ PyQt6 real-time ICU-monitor style frontend for **VitalSense5** (`1280x720` Waves
 |---|---|
 | [`docs/FRONTEND_PLAN.md`](docs/FRONTEND_PLAN.md) | Scoped frontend architecture, `1280x720` screen/widget design, RPi 5 kiosk & touchscreen ergonomics, and teammate adapter integration contracts. |
 | [`docs/DESIGN_GAP_REPORT.md`](docs/DESIGN_GAP_REPORT.md) | Exhaustive gap audit (`GAP-01`–`GAP-26`) comparing the `VitalSense-5` Figma design against `project.md` and product requirements, with frontend mitigations and open team decisions. |
+| [`firmware.md`](firmware.md) | ESP32-S3-Zero dual-core FreeRTOS firmware specification (`200 Hz` MAX30102 dual-bus hot-plug, INA219 2S2P SoC, `460800` baud NDJSON protocol) & PlatformIO implementation in [`firmware/`](firmware/). |
 | [`project.md`](project.md) | Read-only hardware, communication, and algorithm specification for the full VitalSense5 project. |
 
 ---

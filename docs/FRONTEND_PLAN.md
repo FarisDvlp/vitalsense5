@@ -213,7 +213,7 @@ from vitalsense5.main import create_app
 def run_production() -> int:
     app = QApplication(sys.argv)
     window = create_app(
-        vital_port=SerialVitalAdapter(port="/dev/ttyAMA0", baudrate=115200),
+        vital_port=SerialVitalAdapter(port="/dev/ttyAMA0", baudrate=460800),
         patient_store=SqlitePatientStore("vitalsense5.db"),
         settings_store=SqliteSettingsStore("vitalsense5.db"),
         command_handler=SessionService("vitalsense5.db"),

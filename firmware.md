@@ -368,7 +368,8 @@ VitalSense5/
 │   │   ├── config.h                  # Pin definitions, I2C rates, 200 Hz register constants
 │   │   ├── protocol_types.h          # PpgSampleFrame, PowerHealthTelemetry, FirmwareCommand
 │   │   ├── sensor_manager.h          # Dual-MAX30102 hot-plug & FIFO drain controller
-│   │   └── power_monitor.h           # INA219 filter & 2S2P piecewise SoC lookup
+│   │   ├── power_monitor.h           # INA219 filter & 2S2P piecewise SoC lookup
+│   │   └── uart_comms.h              # Core 0 UART1 NDJSON streamer & command parser API
 │   └── src/
 │       ├── main.cpp                  # FreeRTOS queue init & xTaskCreatePinnedToCore(Core 0/1)
 │       ├── sensor_manager.cpp        # Core 1 I2C0/I2C1 management & 9-clock bus recovery
