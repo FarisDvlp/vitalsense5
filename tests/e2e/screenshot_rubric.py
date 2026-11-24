@@ -405,6 +405,8 @@ def run_screenshot_rubric(output_dir: Path | str, window: Any = None) -> RubricR
             "vital_pi",
             "vital_spo2",
             "vital_bp",
+            "lbl_source_status",
+            "lbl_finger_status",
             "ppg_canvas",
             "btn_patient",
             "btn_settings",

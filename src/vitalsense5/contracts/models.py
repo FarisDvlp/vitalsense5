@@ -93,6 +93,7 @@ class DeviceStatus:
     is_charging: bool = False
     recording_active: bool = False
     recording_elapsed_s: int = 0
+    sensor_source: str = "onboard"
     status_message: str = ""
 
 

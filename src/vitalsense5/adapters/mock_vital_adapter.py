@@ -56,6 +56,7 @@ class _ProfileSpec:
     bp_dia_base: float
     bpm_base: float
     noise_amp: float = 0.0
+    sensor_source: str = "onboard"
 
 
 _PROFILE_SPECS: dict[str, _ProfileSpec] = {
@@ -213,6 +214,7 @@ _PROFILE_SPECS: dict[str, _ProfileSpec] = {
         bp_sys_base=0.0,
         bp_dia_base=0.0,
         bpm_base=0.0,
+        sensor_source="none",
     ),
     "low_battery": _ProfileSpec(
         uart_state=ConnectionState.CONNECTED,
@@ -528,6 +530,7 @@ class MockVitalDataAdapter:
                 is_charging=spec.is_charging,
                 recording_active=self._recording_active,
                 recording_elapsed_s=elapsed_s,
+                sensor_source=spec.sensor_source,
                 status_message=spec.status_message,
             )
 

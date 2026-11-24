@@ -157,11 +157,14 @@ def test_f2_out_of_range_waveform_samples_clamped_inside_canvas(harness: h.AppHa
     above_rect = ppg_rect.translated(0, -30)
     above_rect.setHeight(24)
 
+    before = h.grab_image(harness.window)
+    before_count = h.count_color_pixels(before, "#313131", rect=above_rect, tolerance=16, stride=1)
+
     harness.vital_port.push_waveform([-5.0, 5.0, 0.0, 10.0, -10.0, 8.0, -8.0] * 10)
     h.pump_events(140)
 
     img = h.grab_image(harness.window)
-    assert h.count_color_pixels(img, "#313131", rect=above_rect, tolerance=16, stride=1) == 0
+    assert h.count_color_pixels(img, "#313131", rect=above_rect, tolerance=16, stride=1) == before_count
 
 
 def test_f2_large_waveform_batch_1000_samples_no_freeze(harness: h.AppHarness) -> None:

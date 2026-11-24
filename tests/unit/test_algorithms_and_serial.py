@@ -333,3 +333,27 @@ def test_serial_adapter_background_threads_and_malformed_finger_field() -> None:
 
     assert len(created) == 1
     assert created[0].closed is True
+
+
+def test_serial_vital_adapter_tracks_sensor_source_and_finger_status() -> None:
+    adapter = SerialVitalAdapter(sample_rate_hz=200.0, heartbeat_timeout_s=0.5)
+    assert adapter.device_status().sensor_source == "none"
+
+    adapter.ingest_ndjson_line(
+        '{"type":"s","seq":1,"ts":10,"r":100000,"ir":120000,"src":"onboard","f":1}'
+    )
+    st = adapter.device_status()
+    assert st.sensor_source == "onboard"
+    assert st.sensor_state != SensorState.FINGER_OFF
+
+    adapter.ingest_ndjson_line(
+        '{"type":"t","up":5,"src":"clip","clip":1,"ob":1,"f":0,"v":8.1,"i":100,"soc":90,"chg":0,"drp":0}'
+    )
+    st = adapter.device_status()
+    assert st.sensor_source == "clip"
+    assert st.sensor_state == SensorState.FINGER_OFF
+
+    adapter._last_packet_time = time.monotonic() - 1.0  # noqa: SLF001
+    st = adapter.device_status()
+    assert st.uart_state == ConnectionState.DISCONNECTED
+    assert st.sensor_source == "none"

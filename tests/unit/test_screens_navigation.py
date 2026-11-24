@@ -258,6 +258,8 @@ def test_main_screen_geometry_zero_overlap_and_button_colors(qapp: QApplication)
         ms.vital_pi,
         ms.vital_spo2,
         ms.vital_bp,
+        ms.lbl_source_status,
+        ms.lbl_finger_status,
         ms.ppg_canvas,
         ms.btn_patient,
         ms.btn_settings,
@@ -1120,5 +1122,75 @@ def test_toast_banner_position_per_screen_and_resize(qapp: QApplication) -> None
     QApplication.processEvents()
     assert win.screen_stack.currentWidget() is win.main_screen
     assert win.toast_banner.geometry() == QRect(stage_x + 515, stage_y + 630, 254, 46)
+
+    win.close()
+
+
+def test_main_screen_source_and_finger_status_labels(qapp: QApplication) -> None:
+    win = create_app(kiosk=False, tick_ms=100)
+    win.show()
+    QApplication.processEvents()
+
+    ms = win.main_screen
+    assert ms.lbl_source_status.isVisible()
+    assert ms.lbl_finger_status.isVisible()
+    assert ms.lbl_source_status.text() == "Source: On-Board"
+    assert ms.lbl_finger_status.text() == "Finger: On"
+
+    # Aligned with PPG canvas left (x=80) and right (x=1204) edges, sitting above y=348
+    assert ms.lbl_source_status.x() == ms.ppg_canvas.x()
+    assert ms.lbl_finger_status.x() + ms.lbl_finger_status.width() == (
+        ms.ppg_canvas.x() + ms.ppg_canvas.width()
+    )
+    assert ms.lbl_source_status.y() == 323
+    assert ms.lbl_finger_status.y() == 323
+    assert ms.lbl_source_status.y() + ms.lbl_source_status.height() < ms.ppg_canvas.y()
+    assert ms.lbl_finger_status.y() + ms.lbl_finger_status.height() < ms.ppg_canvas.y()
+
+    ms.update_device_status(
+        DeviceStatus(sensor_source="clip", sensor_state=SensorState.OK)
+    )
+    assert ms.lbl_source_status.text() == "Source: Finger Clip"
+    assert ms.lbl_finger_status.text() == "Finger: On"
+
+    ms.update_device_status(
+        DeviceStatus(sensor_source="clip", sensor_state=SensorState.FINGER_OFF)
+    )
+    assert ms.lbl_source_status.text() == "Source: Finger Clip"
+    assert ms.lbl_finger_status.text() == "Finger: Off"
+
+    ms.update_device_status(
+        DeviceStatus(sensor_source="none", sensor_state=SensorState.FINGER_OFF)
+    )
+    assert ms.lbl_source_status.text() == "Source: None"
+    assert ms.lbl_finger_status.text() == "Finger: Off"
+
+    ms.update_device_status(
+        DeviceStatus(sensor_source="none", sensor_state=SensorState.OK)
+    )
+    assert ms.lbl_source_status.text() == "Source: None"
+    assert ms.lbl_finger_status.text() == "Finger: --"
+
+    ms.update_device_status(
+        DeviceStatus(
+            uart_state=ConnectionState.DISCONNECTED,
+            esp32_state=ConnectionState.DISCONNECTED,
+            sensor_source="onboard",
+            sensor_state=SensorState.OK,
+        )
+    )
+    assert ms.lbl_source_status.text() == "Source: --"
+    assert ms.lbl_finger_status.text() == "Finger: --"
+
+    ms.update_device_status(
+        DeviceStatus(
+            uart_state=ConnectionState.CONNECTED,
+            esp32_state=ConnectionState.RECONNECTING,
+            sensor_source="onboard",
+            sensor_state=SensorState.OK,
+        )
+    )
+    assert ms.lbl_source_status.text() == "Source: --"
+    assert ms.lbl_finger_status.text() == "Finger: --"
 
     win.close()

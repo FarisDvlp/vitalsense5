@@ -7,7 +7,14 @@ from datetime import datetime
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from vitalsense5.contracts import DeviceStatus, PatientRecord, VitalSnapshot, WaveformBatch
+from vitalsense5.contracts import (
+    ConnectionState,
+    DeviceStatus,
+    PatientRecord,
+    SensorState,
+    VitalSnapshot,
+    WaveformBatch,
+)
 from vitalsense5.theme import COLORS, LAYOUT, TYPOGRAPHY, font_from_token
 from vitalsense5.widgets import (
     ActionButton,
@@ -16,6 +23,37 @@ from vitalsense5.widgets import (
     StatusHeaderBar,
     VitalColumnWidget,
 )
+
+
+def _format_source_text(status: DeviceStatus) -> str:
+    if (
+        status.uart_state != ConnectionState.CONNECTED
+        or status.esp32_state != ConnectionState.CONNECTED
+    ):
+        return "Source: --"
+    raw = (getattr(status, "sensor_source", "") or "").strip()
+    key = raw.lower()
+    if key in ("onboard", "on-board", "on_board"):
+        return "Source: On-Board"
+    if key in ("clip", "finger_clip", "finger-clip", "finger clip"):
+        return "Source: Finger Clip"
+    if key in ("none", ""):
+        return "Source: None"
+    return f"Source: {raw}"
+
+
+def _format_finger_text(status: DeviceStatus) -> str:
+    if (
+        status.uart_state != ConnectionState.CONNECTED
+        or status.esp32_state != ConnectionState.CONNECTED
+    ):
+        return "Finger: --"
+    if status.sensor_state == SensorState.FINGER_OFF:
+        return "Finger: Off"
+    raw_source = (getattr(status, "sensor_source", "") or "").strip().lower()
+    if raw_source in ("none", ""):
+        return "Finger: --"
+    return "Finger: On"
 
 
 class MainScreen(QWidget):
@@ -41,7 +79,7 @@ class MainScreen(QWidget):
         )
         self.header_bar.move(0, 0)
 
-        # Five vital columns (y=133, h=195)
+        # Five vital columns (y=133, h=185 -> bottom=318, clear of y=323 source/finger bar)
         self.vital_prv = VitalColumnWidget(
             vital_key="PRV",
             title="PRV",
@@ -51,7 +89,7 @@ class MainScreen(QWidget):
             sublabel="RMSSD",
             show_bpm=False,
             width_px=178,
-            height_px=195,
+            height_px=185,
             parent=self,
         )
         self.vital_prv.move(80, 133)
@@ -63,7 +101,7 @@ class MainScreen(QWidget):
             accent_color=COLORS.ACCENT_RR,
             object_name="vital_rr",
             width_px=218,
-            height_px=195,
+            height_px=185,
             parent=self,
         )
         self.vital_rr.move(266, 133)
@@ -77,7 +115,7 @@ class MainScreen(QWidget):
             object_name="vital_pi",
             letter_spacing_px=-3.84,
             width_px=174,
-            height_px=195,
+            height_px=185,
             parent=self,
         )
         self.vital_pi.move(496, 133)
@@ -89,7 +127,7 @@ class MainScreen(QWidget):
             accent_color=COLORS.ACCENT_SPO2,
             object_name="vital_spo2",
             width_px=184,
-            height_px=195,
+            height_px=185,
             parent=self,
         )
         self.vital_spo2.move(674, 133)
@@ -98,7 +136,7 @@ class MainScreen(QWidget):
             object_name="vital_bp",
             accent_color=COLORS.ACCENT_BP,
             width_px=348,
-            height_px=195,
+            height_px=185,
             parent=self,
         )
         self.vital_bp.move(866, 133)
@@ -109,6 +147,29 @@ class MainScreen(QWidget):
             self.vital_pi,
             self.vital_spo2,
             self.vital_bp,
+        )
+
+        # Source & Finger status labels above PPG canvas (y=323, h=21)
+        self.lbl_source_status = QLabel("Source: On-Board", self)
+        self.lbl_source_status.setObjectName("lbl_source_status")
+        self.lbl_source_status.setGeometry(80, 323, 300, 21)
+        self.lbl_source_status.setFont(font_from_token(TYPOGRAPHY.CONNECTION_STATUS))
+        self.lbl_source_status.setStyleSheet(
+            f"color: {COLORS.TEXT_PRIMARY}; background: transparent;"
+        )
+        self.lbl_source_status.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+
+        self.lbl_finger_status = QLabel("Finger: On", self)
+        self.lbl_finger_status.setObjectName("lbl_finger_status")
+        self.lbl_finger_status.setGeometry(1004, 323, 200, 21)
+        self.lbl_finger_status.setFont(font_from_token(TYPOGRAPHY.CONNECTION_STATUS))
+        self.lbl_finger_status.setStyleSheet(
+            f"color: {COLORS.TEXT_PRIMARY}; background: transparent;"
+        )
+        self.lbl_finger_status.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
 
         # Live PPG waveform canvas (80, 348, 1124, 250) — 10s @ 200Hz with 0.25s ICU sweep gap
@@ -176,6 +237,8 @@ class MainScreen(QWidget):
     def update_device_status(self, status: DeviceStatus) -> None:
         self.header_bar.update_device_status(status)
         self.ppg_canvas.update_device_status(status)
+        self.lbl_source_status.setText(_format_source_text(status))
+        self.lbl_finger_status.setText(_format_finger_text(status))
 
     def set_active_patient(self, patient: PatientRecord | None) -> None:
         self.header_bar.set_active_patient_name(

@@ -487,9 +487,11 @@ class SerialVitalAdapter:
             uart_state = self._uart_state
             esp32_state = self._esp32_state
             status_msg = self._status_message
+            sensor_source = self._active_source
             if self._is_heartbeat_timed_out_locked():
                 uart_state = ConnectionState.DISCONNECTED
                 esp32_state = ConnectionState.DISCONNECTED
+                sensor_source = "none"
                 status_msg = "UART / ESP32 heartbeat timeout"
 
             return DeviceStatus(
@@ -502,6 +504,7 @@ class SerialVitalAdapter:
                 is_charging=self._is_charging,
                 recording_active=False,
                 recording_elapsed_s=0,
+                sensor_source=sensor_source,
                 status_message=status_msg,
             )
 
