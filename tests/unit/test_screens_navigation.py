@@ -1071,3 +1071,54 @@ def test_new_patient_dialog_gender_create_and_edit(qapp: QApplication) -> None:
     assert dlg._gender_popover.width() == dlg.btn_patient_gender.width()  # noqa: SLF001
 
     win.close()
+
+
+def test_toast_banner_position_per_screen_and_resize(qapp: QApplication) -> None:
+    from PyQt6.QtCore import QRect
+
+    win = create_app(kiosk=False, tick_ms=100)
+    win.show()
+    QApplication.processEvents()
+
+    # MainScreen: toast_banner sits at (515, 630, 254, 46)
+    win._show_toast("Main toast", level="info")  # noqa: SLF001
+    QApplication.processEvents()
+    assert win.toast_banner.isVisible()
+    assert win.toast_banner.geometry() == QRect(515, 630, 254, 46)
+
+    # Switching to PatientScreen moves toast_banner into the BACK..DELETE gap (296, 630, 254, 46)
+    QTest.mouseClick(win.main_screen.btn_patient, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert win.screen_stack.currentWidget() is win.patient_screen
+    assert win.toast_banner.geometry() == QRect(296, 630, 254, 46)
+
+    # Showing a toast on PatientScreen keeps (296, 630, 254, 46) and never overlaps bottom buttons
+    win._show_toast("Cannot delete patient while recording", level="warning")  # noqa: SLF001
+    QApplication.processEvents()
+    assert win.toast_banner.geometry() == QRect(296, 630, 254, 46)
+    for btn in (
+        win.patient_screen.btn_back,
+        win.patient_screen.btn_delete_patient,
+        win.patient_screen.btn_edit_patient,
+        win.patient_screen.btn_new_patient,
+    ):
+        assert not win.toast_banner.geometry().intersects(btn.geometry())
+
+    # Resizing host (e.g. 1920x1080) offsets toast_banner cleanly with _root_stage
+    win.setMinimumSize(0, 0)
+    win.setMaximumSize(16777215, 16777215)
+    win.resize(1920, 1080)
+    QApplication.processEvents()
+    stage_x = win._root_stage.x()  # noqa: SLF001
+    stage_y = win._root_stage.y()  # noqa: SLF001
+    assert stage_x == (1920 - 1280) // 2
+    assert stage_y == (1080 - 720) // 2
+    assert win.toast_banner.geometry() == QRect(stage_x + 296, stage_y + 630, 254, 46)
+
+    # Returning to MainScreen restores MainScreen offset relative to _root_stage
+    QTest.mouseClick(win.patient_screen.btn_back, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+    assert win.screen_stack.currentWidget() is win.main_screen
+    assert win.toast_banner.geometry() == QRect(stage_x + 515, stage_y + 630, 254, 46)
+
+    win.close()

@@ -168,6 +168,7 @@ class MainWindow(QMainWindow):
         self._layout_stage_and_overlays()
 
     def _wire_signals(self) -> None:
+        self.screen_stack.currentChanged.connect(lambda _idx: self._layout_toast_banner())
         self.main_screen.patient_requested.connect(self._show_patient_screen)
         self.main_screen.settings_requested.connect(self.open_settings_modal)
         self.main_screen.record_requested.connect(self._on_record_clicked)
@@ -341,9 +342,7 @@ class MainWindow(QMainWindow):
             LAYOUT.WINDOW_HEIGHT,
         )
         self.modal_scrim.setGeometry(0, 0, host_w, host_h)
-        toast_x = min(stage_x + 515, max(8, host_w - 254 - 8))
-        toast_y = min(stage_y + 630, max(8, host_h - 46 - 8))
-        self.toast_banner.setGeometry(toast_x, toast_y, 254, 46)
+        self._layout_toast_banner()
         kb_h = self.virtual_keyboard.height()
         self.virtual_keyboard.setGeometry(
             0,
@@ -352,6 +351,27 @@ class MainWindow(QMainWindow):
             kb_h,
         )
         self._layout_overlays()
+
+    def _toast_stage_rect(self) -> tuple[int, int, int, int]:
+        if hasattr(self, "screen_stack") and self.screen_stack.currentWidget() is self.patient_screen:
+            return (296, 630, 254, 46)
+        return (515, 630, 254, 46)
+
+    def _layout_toast_banner(self) -> None:
+        if not hasattr(self, "toast_banner"):
+            return
+        if self._central_host.isVisible() and self._central_host.width() == self.width():
+            host_w = self._central_host.width() or self.width() or LAYOUT.WINDOW_WIDTH
+            host_h = self._central_host.height() or self.height() or LAYOUT.WINDOW_HEIGHT
+        else:
+            host_w = self.width() or LAYOUT.WINDOW_WIDTH
+            host_h = self.height() or LAYOUT.WINDOW_HEIGHT
+        stage_x = self._root_stage.x()
+        stage_y = self._root_stage.y()
+        rel_x, rel_y, toast_w, toast_h = self._toast_stage_rect()
+        toast_x = min(stage_x + rel_x, max(8, host_w - toast_w - 8))
+        toast_y = min(stage_y + rel_y, max(8, host_h - toast_h - 8))
+        self.toast_banner.setGeometry(toast_x, toast_y, toast_w, toast_h)
 
     def _layout_overlays(self) -> None:
         scrim_w = self.modal_scrim.width() or self.width() or LAYOUT.WINDOW_WIDTH
@@ -468,10 +488,12 @@ class MainWindow(QMainWindow):
     def _show_main_screen(self) -> None:
         self._refresh_patient_bindings()
         self.screen_stack.setCurrentWidget(self.main_screen)
+        self._layout_toast_banner()
 
     def _show_patient_screen(self) -> None:
         self._refresh_patient_bindings()
         self.screen_stack.setCurrentWidget(self.patient_screen)
+        self._layout_toast_banner()
 
     def _safe_get_active_patient(self) -> PatientRecord | None:
         try:
@@ -583,6 +605,7 @@ class MainWindow(QMainWindow):
             f" padding: 2px 8px;"
             f"}}"
         )
+        self._layout_toast_banner()
         self.toast_banner.setText(message)
         self.toast_banner.show()
         self.toast_banner.raise_()
