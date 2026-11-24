@@ -533,35 +533,35 @@ def test_ppg_canvas_fault_overlays_and_recovery(qapp: QApplication) -> None:
     canvas.close()
 
 
-def test_ppg_canvas_125hz_10s_icu_sweep_and_gap(qapp: QApplication) -> None:
+def test_ppg_canvas_200hz_10s_icu_sweep_and_gap(qapp: QApplication) -> None:
     canvas = PPGCanvasWidget()
     canvas.show()
-    assert canvas.max_samples == 1250
-    assert canvas.gap_samples == 31
+    assert canvas.max_samples == 2000
+    assert canvas.gap_samples == 50
 
     # Fill 1 full 10s pass + 400 samples into the second pass (cursor at 400)
-    samples = [0.6 * math.sin(i * 0.15) for i in range(1250 + 400)]
+    samples = [0.6 * math.sin(i * 0.15) for i in range(2000 + 400)]
     canvas.append_samples(samples)
-    assert len(canvas.samples()) == 1250
+    assert len(canvas.samples()) == 2000
     assert canvas.sweep_index == 400
 
     img = _grab(canvas)
     inner_left = 5 + 2
     usable_w = canvas.width() - 10 - 4
-    step_x = usable_w / (1250 - 1)
+    step_x = usable_w / (2000 - 1)
 
     # Left of cursor [0..399] has trace pixels
     left_rect = QRect(inner_left + 10, 10, int(350 * step_x), canvas.height() - 20)
     assert _count_color(img, COLORS.PPG_TRACE, rect=left_rect, tolerance=20) >= 10
 
-    # 0.25s erase gap [400..430] (strict interior avoiding dot & endpoints) has 0 trace pixels
-    gap_x0 = int(round(inner_left + 404 * step_x))
-    gap_x1 = int(round(inner_left + 427 * step_x))
+    # 0.25s erase gap [400..449] (strict interior avoiding dot & endpoints) has 0 trace pixels
+    gap_x0 = int(round(inner_left + 406 * step_x))
+    gap_x1 = int(round(inner_left + 444 * step_x))
     gap_rect = QRect(gap_x0, 10, max(4, gap_x1 - gap_x0), canvas.height() - 20)
     assert _count_color(img, COLORS.PPG_TRACE, rect=gap_rect, tolerance=16) == 0
 
-    # Right of gap [431..1249] still shows previous pass trace
-    right_x0 = int(round(inner_left + 440 * step_x))
+    # Right of gap [450..1999] still shows previous pass trace
+    right_x0 = int(round(inner_left + 460 * step_x))
     right_rect = QRect(right_x0, 10, canvas.width() - right_x0 - 15, canvas.height() - 20)
     assert _count_color(img, COLORS.PPG_TRACE, rect=right_rect, tolerance=20) >= 10
 

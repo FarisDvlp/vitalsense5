@@ -361,7 +361,7 @@ class MockVitalDataAdapter:
     def __init__(
         self,
         *,
-        sample_rate_hz: float = 125.0,
+        sample_rate_hz: float = 200.0,
         initial_profile: str = "normal",
     ) -> None:
         if isinstance(sample_rate_hz, bool) or sample_rate_hz <= 0.0 or not math.isfinite(sample_rate_hz):

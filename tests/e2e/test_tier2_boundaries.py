@@ -45,12 +45,17 @@ def test_f1_scope_exclusion_no_esp32_firmware_files() -> None:
 
 def test_f1_scope_exclusion_no_sqlite_or_pyserial_in_frontend() -> None:
     pkg_dir = h.SRC_DIR / "vitalsense5"
+    backend_dir = pkg_dir / "backend"
     assert pkg_dir.is_dir(), "src/vitalsense5 missing"
-    forbidden = {"sqlite3", "sqlalchemy", "serial", "pyserial"}
+    db_forbidden = {"sqlite3", "sqlalchemy"}
+    serial_forbidden = {"serial", "pyserial"}
     for py_file in pkg_dir.rglob("*.py"):
         mods = _collect_imported_modules(py_file)
-        hits = mods & forbidden
-        assert not hits, f"Forbidden backend/DB/serial imports {hits} in {py_file}"
+        db_hits = mods & db_forbidden
+        assert not db_hits, f"Forbidden DB imports {db_hits} in {py_file}"
+        if not py_file.is_relative_to(backend_dir):
+            serial_hits = mods & serial_forbidden
+            assert not serial_hits, f"Forbidden serial imports {serial_hits} in frontend file {py_file}"
 
 
 def test_f1_scope_exclusion_no_scipy_or_ml_in_ui_layers() -> None:

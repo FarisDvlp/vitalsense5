@@ -76,7 +76,7 @@ class WaveformBatch:
     """Batch of normalized PPG waveform samples from the signal pipeline."""
 
     samples: list[float] = field(default_factory=list)
-    sample_rate_hz: float = 125.0
+    sample_rate_hz: float = 200.0
     timestamp: datetime = field(default_factory=datetime.now)
 
 

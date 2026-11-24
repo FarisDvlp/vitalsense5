@@ -1,0 +1,5 @@
+numpy>=1.22.0
+scipy>=1.9.0
+pyserial>=3.5
+# Optional: if native XGBoost is desired instead of pure-Python tree evaluator:
+# xgboost>=1.7.0

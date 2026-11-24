@@ -138,7 +138,7 @@ class FakeVitalDataPort:
         ):
             return self._c.WaveformBatch(
                 samples=[],
-                sample_rate_hz=125.0,
+                sample_rate_hz=200.0,
                 timestamp=datetime.now(),
             )
         samples: list[float] = []
@@ -150,7 +150,7 @@ class FakeVitalDataPort:
         self._phase += 8 * 0.18
         return self._c.WaveformBatch(
             samples=samples,
-            sample_rate_hz=125.0,
+            sample_rate_hz=200.0,
             timestamp=datetime.now(),
         )
 
@@ -180,7 +180,7 @@ class FakeVitalDataPort:
     def set_snapshot(self, snapshot: Any) -> None:
         self._snapshot = snapshot
 
-    def push_waveform(self, samples: list[float], sample_rate_hz: float = 125.0) -> None:
+    def push_waveform(self, samples: list[float], sample_rate_hz: float = 200.0) -> None:
         self._pending_batches.append(
             self._c.WaveformBatch(
                 samples=list(samples),

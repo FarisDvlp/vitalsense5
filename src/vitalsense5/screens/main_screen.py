@@ -111,9 +111,9 @@ class MainScreen(QWidget):
             self.vital_bp,
         )
 
-        # Live PPG waveform canvas (80, 348, 1124, 250) — 10s @ 125Hz with 0.25s ICU sweep gap
+        # Live PPG waveform canvas (80, 348, 1124, 250) — 10s @ 200Hz with 0.25s ICU sweep gap
         self.ppg_canvas = PPGCanvasWidget(
-            sample_rate_hz=125.0,
+            sample_rate_hz=200.0,
             window_seconds=10.0,
             gap_seconds=0.25,
             parent=self,

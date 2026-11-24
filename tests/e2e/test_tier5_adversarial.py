@@ -520,10 +520,10 @@ def test_t5_11_malformed_waveform_batch_and_normalized_settings_value_sync(
                 self._emitted_malformed = True
                 return c.WaveformBatch(
                     samples=[None, "bad", True, float("nan"), 0.25, 0.75],
-                    sample_rate_hz=125.0,
+                    sample_rate_hz=200.0,
                     timestamp=datetime.now(),
                 )
-            return c.WaveformBatch(samples=[], sample_rate_hz=125.0, timestamp=datetime.now())
+            return c.WaveformBatch(samples=[], sample_rate_hz=200.0, timestamp=datetime.now())
 
     vital_port = _MalformedWaveformPort(c)
     settings_store = _NormalizingSettingsPort()

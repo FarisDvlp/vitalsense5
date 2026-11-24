@@ -24,7 +24,7 @@ class PPGCanvasWidget(QWidget):
     def __init__(
         self,
         *,
-        sample_rate_hz: float = 125.0,
+        sample_rate_hz: float = 200.0,
         window_seconds: float = 10.0,
         gap_seconds: float = 0.25,
         max_samples: int | None = None,

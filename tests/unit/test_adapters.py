@@ -155,7 +155,7 @@ def test_enums_and_dto_positional_construction_and_immutability() -> None:
 
     batch = WaveformBatch()
     assert batch.samples == []
-    assert batch.sample_rate_hz == 125.0
+    assert batch.sample_rate_hz == 200.0
     assert isinstance(batch.timestamp, datetime)
 
     status = DeviceStatus()
@@ -176,7 +176,7 @@ def test_enums_and_dto_positional_construction_and_immutability() -> None:
 
 
 def test_ppg_waveform_lifecycle_bounds_and_progression() -> None:
-    adapter = MockVitalDataAdapter(sample_rate_hz=125.0)
+    adapter = MockVitalDataAdapter(sample_rate_hz=200.0)
 
     # Stopped initially -> no samples
     assert adapter.pop_waveform_samples().samples == []
@@ -185,7 +185,7 @@ def test_ppg_waveform_lifecycle_bounds_and_progression() -> None:
     batches = [adapter.pop_waveform_samples() for _ in range(12)]
     all_samples = [sample for batch in batches for sample in batch.samples]
 
-    assert all(batch.sample_rate_hz == 125.0 for batch in batches)
+    assert all(batch.sample_rate_hz == 200.0 for batch in batches)
     assert all(len(batch.samples) >= 1 for batch in batches)
     assert all(-1.0 <= s <= 1.0 for s in all_samples)
     assert max(all_samples) > 0.3
